@@ -1,0 +1,138 @@
+PaintHD
+
+PaintHD is a monochrome bitmap paint program for the Picocomputer RP6502 target.
+It works on a 640x480 canvas in 1-bit color mode and stores images as monochrome BMP files.
+
+Overview
+
+- Left mouse button and right mouse button paint with opposite colors.
+- The swap icon changes which mouse button paints white and which paints black.
+- The toolbar shows brush size, mouse coordinates, hover hints, and operation status.
+- The toolbar can be moved by dragging its handle.
+- Double-clicking the toolbar handle moves it to the top-left corner.
+
+Mouse and keyboard
+
+- LMB paints with the color assigned to the left button.
+- RMB paints with the color assigned to the right button.
+- Ctrl + LMB starts and continues straight line drawing.
+- Ctrl + Shift + LMB constrains line drawing to horizontal or vertical segments.
+- Esc cancels selection mode, paste preview, primitive preview, and long operations that support cancellation.
+- Ctrl + A clears the current selection and returns to normal painting.
+- Ctrl + C copies the current selection to the clipboard file.
+- Ctrl + X copies the current selection and clears the selected area.
+- Ctrl + V starts opaque paste preview.
+- Ctrl + Alt + V starts transparent paste preview.
+- Ctrl + Z performs undo.
+- Ctrl + Y performs redo.
+- Alt + F10 saves to painthd_save.bmp and exits.
+
+Brush tools
+
+Available brush shapes:
+
+- square
+- circle
+- vertical line
+- diagonal line
+- spray
+- fill
+
+Brush behavior:
+
+- The active brush is used for freehand painting, straight lines, rectangles, and ellipses.
+- The fill tool is only available in normal brush mode.
+- Rectangle and ellipse tools are disabled when fill is selected.
+- Fill is disabled when rectangle or ellipse mode is active.
+- Double-clicking the vertical brush icon changes it between vertical and horizontal.
+- Double-clicking the diagonal brush icon flips the diagonal direction.
+
+Brush size
+
+- Minus and plus change brush size by one step.
+- Single click on the size field sets size to 1 px.
+- Double-click on the size field sets size to 5 px.
+- Triple-click on the size field sets size to the maximum size.
+
+Primitive tools
+
+Rectangle tool:
+
+- Select the rectangle icon.
+- Press and drag on the canvas to define the rectangle.
+- Release the mouse button to draw the final shape.
+- Hold left Ctrl while sizing to force equal width and height, producing a square.
+
+Ellipse tool:
+
+- Select the ellipse icon.
+- Press and drag on the canvas to define the ellipse.
+- Release the mouse button to draw the final shape.
+- Hold left Ctrl while sizing to force equal width and height, producing a circle.
+
+Selection tool
+
+- Select the selection icon to enter rectangular selection mode.
+- Drag with LMB on the canvas to create a selection rectangle.
+- While dragging, the current selection size is shown in the status area.
+- After the selection is finished, the border is shown as a dotted rectangle.
+- Clicking the selection icon again exits selection mode.
+- While a selection is active, painting and canvas operations work only inside the selected area.
+
+Clipboard and paste
+
+- The clipboard is stored in a temporary file on disk.
+- Opaque paste writes all source pixels.
+- Transparent paste writes only set pixels and leaves zero pixels unchanged.
+- During paste preview, the preview follows the mouse cursor.
+- LMB confirms paste.
+- RMB or Esc cancels paste preview.
+
+Canvas operations
+
+- Wipe all clears the full canvas when selection mode is not active.
+- Wipe selection clears only the selected area when a selection exists.
+- Invert canvas inverts all pixels.
+- Invert selection inverts only the selected area.
+- Mirror canvas flips the full canvas horizontally or vertically.
+- Mirror selection flips only the selected area horizontally or vertically.
+- Double-clicking the mirror icon changes its mode between vertical and horizontal.
+
+Undo and redo
+
+- PaintHD keeps multi-step undo and redo history on disk.
+- New editing operations clear the redo stack.
+- Undo and redo affect the canvas contents and restore the dirty state of the document.
+
+File behavior
+
+- A BMP file may be loaded from argv[1] on startup.
+- The save path may be supplied in argv[2].
+- If no input file is supplied, PaintHD can restore painthd_save.bmp automatically after startup.
+- The save icon is disabled until the canvas is modified.
+- Save and restore status are shown in the toolbar status field.
+
+Status field
+
+The status field is used for:
+
+- operation results such as SAVED, RESTORED, undo, redo, and cancelled
+- selection state messages
+- paste mode messages
+- mirror, invert, wipe, and tool size messages
+- hover descriptions for toolbar icons when no higher-priority status is active
+
+Notes
+
+- PaintHD is designed for cc65 and the RP6502 target.
+- The canvas format is 1 bit per pixel.
+- BMP save and load are intended for matching monochrome image data.
+
+Copyright
+
+PaintHD
+Copyright (c) 2026 WojciechGw
+based on paint.c example
+Copyright (c) 2025 Rumbledethumps
+
+SPDX-License-Identifier: BSD-3-Clause

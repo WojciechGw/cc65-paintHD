@@ -1,0 +1,94 @@
+PaintHD Loader
+
+Purpose
+
+PaintHD Loader is a small launcher for PaintHD. Its job is to scan the program
+directory for BMP files, present them as a simple 4 x 4 selection grid, and
+start PaintHD with the file chosen by the user.
+
+The loader is intended to make opening recent bitmap files faster and more
+convenient than typing file names manually.
+
+How It Works
+
+1. The loader switches to the PaintHD graphics mode.
+2. The current screen buffer is cleared with a block-based wipe effect.
+3. The program directory is scanned for BMP files.
+4. Up to 16 files are shown on one page as 160 x 120 pixel tiles.
+5. Each occupied tile displays:
+   - a monochrome thumbnail of the BMP file,
+   - a black label in the lower-left corner,
+   - the file name in white text.
+6. Empty tile slots are shown as a fine checker pattern.
+7. The user selects a tile with the mouse.
+8. After selection, the loader starts `painthd.rp6502` with the chosen file.
+
+If the selected tile is empty, the loader starts PaintHD with the default file
+name:
+
+`paintHD_new.bmp`
+
+If no BMP files are found in the program directory, the loader returns without
+showing the tile grid. In practice this means there is no existing image to
+choose from and a new file name such as `paintHD_new.bmp` should be used for a
+new drawing.
+
+Display Layout
+
+- Screen size: 640 x 480 pixels
+- Tile size: 160 x 120 pixels
+- Grid layout: 4 columns x 4 rows
+- Files per page: 16
+
+Occupied and Empty Tiles
+
+- Occupied tile:
+  - shows a thumbnail of the BMP image,
+  - shows the file name on a black label strip.
+- Empty tile:
+  - shows a fine checker pattern,
+  - can still be selected to create a new image name.
+
+Controls
+
+Mouse
+
+- Move mouse: move the on-screen pointer
+- Left mouse button on a tile:
+  - occupied tile -> launch PaintHD with that BMP file
+  - empty tile -> launch PaintHD with `paintHD_new.bmp`
+
+Keyboard
+
+- `PgUp` -> show the previous page of tiles
+- `PgDn` -> show the next page of tiles
+
+Paging
+
+If there are more than 16 BMP files in the program directory, the loader splits
+them into multiple pages. Use `PgUp` and `PgDn` to browse older or newer groups
+of files.
+
+File Selection Rules
+
+- The loader scans the program directory for BMP files.
+- File names are displayed inside the tiles.
+- When the user clicks a tile containing a file, that file becomes the startup
+  argument for PaintHD.
+- When the user clicks an empty tile, PaintHD is started with the new file name
+  `paintHD_new.bmp`.
+
+Notes
+
+- PaintHD Loader is only a launcher. It does not edit images.
+- The actual editing is performed by `painthd.rp6502`.
+- The loader is designed for monochrome BMP content and monochrome thumbnails.
+
+Copyright
+
+PaintHD Loader
+Copyright (c) 2026 WojciechGw
+based on paint.c example
+Copyright (c) 2025 Rumbledethumps
+
+SPDX-License-Identifier: BSD-3-Clause
