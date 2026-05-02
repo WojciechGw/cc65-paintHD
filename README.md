@@ -1,3 +1,12 @@
+### Copyright
+
+PaintHD  
+Copyright (c) 2026 WojciechGw  
+based on paint.c example  
+Copyright (c) 2025 Rumbledethumps
+
+SPDX-License-Identifier: BSD-3-Clause
+
 # PaintHD
 
 PaintHD is a monochrome bitmap paint program for the Picocomputer RP6502 target.
@@ -345,11 +354,3 @@ From left to right, the picker contains:
 - Temporary disk files are an intentional part of the design to avoid pressure
   on limited RAM/BSS space.
 
-## Copyright
-
-PaintHD  
-Copyright (c) 2026 WojciechGw  
-based on paint.c example  
-Copyright (c) 2025 Rumbledethumps
-
-SPDX-License-Identifier: BSD-3-Clause
