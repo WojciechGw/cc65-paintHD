@@ -16,6 +16,8 @@ builds file thumbnails and starts PaintHD with a selected image.
 
 ## Main Applications
 
+[!] Please read the `Disk Directories and Runtime Files` section below before use.
+
 ### `paintHD`
 
 The editor itself. It provides direct mouse-based drawing, a movable toolbar
@@ -294,7 +296,7 @@ From left to right, the picker contains:
 
 ### Runtime Directories
 
-- `MSC0:/paintHD/`  
+- `MSCx:/paintHD/`  
   Application root directory.
   
   It is strongly recommended to preserve the directory structure.
@@ -303,24 +305,24 @@ From left to right, the picker contains:
   + - TMP (create this directory before first use)
   ```
 
-- `MSC0:/paintHD/TMP/`  
+- `MSCx:/paintHD/TMP/`  
   Temporary working directory used by PaintHD and the loader.
 
 ### Runtime Temporary Files
 
-- `MSC0:/paintHD/TMP/painthd_clip.bin`  
+- `MSCx:/paintHD/TMP/painthd_clip.bin`  
   Clipboard file.
 
-- `MSC0:/paintHD/TMP/paintHD_c.bin`  
+- `MSCx:/paintHD/TMP/paintHD_c.bin`  
   Current snapshot used by undo/redo staging.
 
-- `MSC0:/paintHD/TMP/paintHD_u###.bin`  
+- `MSCx:/paintHD/TMP/paintHD_u###.bin`  
   Undo snapshots.
 
-- `MSC0:/paintHD/TMP/paintHD_r###.bin`  
+- `MSCx:/paintHD/TMP/paintHD_r###.bin`  
   Redo snapshots.
 
-- `MSC0:/paintHD/TMP/loader_p###.bin`  
+- `MSCx:/paintHD/TMP/loader_p###.bin`  
   Cached loader pages with ready-made `1 bpp` thumbnails.
 
 ### Main Image Files
