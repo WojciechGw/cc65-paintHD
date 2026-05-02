@@ -296,6 +296,12 @@ From left to right, the picker contains:
 
 - `MSC0:/paintHD/`  
   Application root directory.
+  
+  It is strongly recommended to preserve the directory structure.
+  ```  
+  MSCx:/paintHD (place `paintHD.rp6502` and `paintHDloader.rp6502` here)
+  + - TMP (create this directory before first use)
+  ```
 
 - `MSC0:/paintHD/TMP/`  
   Temporary working directory used by PaintHD and the loader.
@@ -324,9 +330,6 @@ From left to right, the picker contains:
 
 - `painthd_save.bmp`  
   Default save/restore file used by startup restore and forced exit save.
-
-- `BAK_<name>.bmp`  
-  Backup created when a file is explicitly loaded for editing.
 
 ## Repository Layout
 
