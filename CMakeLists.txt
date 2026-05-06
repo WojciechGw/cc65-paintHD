@@ -14,7 +14,7 @@ target_sources(paintHD PRIVATE
 )
 
 add_executable(paintHDloader)
-rp6502_asset(paintHDloader 0x10000 assets/paintHDwallpaper.bin)
+rp6502_asset(paintHDloader 0x10000 assets/paintHDtools.bin)
 rp6502_executable(paintHDloader DATA 0x200 RESET 0x200)
 target_sources(paintHDloader PRIVATE
     src/paintHDloader.c
