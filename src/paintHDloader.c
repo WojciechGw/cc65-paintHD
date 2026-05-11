@@ -1,5 +1,5 @@
 /*
- * PaintHD loader test
+ * PaintHD loader
  * Copyright (c) 2026 WojciechGw
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -396,7 +396,7 @@ static unsigned startup_page_base(void)
 
 static void startup_page_cache_path(unsigned page, char *out)
 {
-    memcpy(out, "MSC0:/paintHD/TMP/loader_p000.bin", STARTUP_CACHE_PATH_LEN);
+    memcpy(out, "TMP/loader_p000.bin", STARTUP_CACHE_PATH_LEN);
     out[26] = (char)('0' + ((page / 100u) % 10u));
     out[27] = (char)('0' + ((page / 10u) % 10u));
     out[28] = (char)('0' + (page % 10u));

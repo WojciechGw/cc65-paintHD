@@ -1,5 +1,5 @@
 /*
- * PaintHD loader test
+ * PaintHD loader
  * Copyright (c) 2026 WojciechGw
  *
  * SPDX-License-Identifier: BSD-3-Clause
