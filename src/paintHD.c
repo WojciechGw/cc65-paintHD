@@ -72,6 +72,7 @@ static clock_t mirror_click_deadline;
 static clock_t ctrl_hover_deadline;
 static uint8_t startup_splash_pending;
 static uint8_t help_pending;
+static uint8_t picker_collapsed;
 static int g_argc;
 static char **g_argv;
 static uint8_t size_click_pending;
@@ -3525,6 +3526,31 @@ static void draw_all_shape_buttons(void)
         draw_shape_button(s);
 }
 
+static void draw_picker_handle_only(void)
+{
+    int i, x, y;
+    RIA.step0 = 1;
+    for (y = 0; y < PICKER_HEIGHT; y++)
+    {
+        RIA.addr0 = PICKER_HANDLE_DATA + PICKER_COLLAPSED_WIDTH * y;
+        for (x = 0; x < PICKER_COLLAPSED_WIDTH; x++)
+            RIA.rw0 = PICKER_BG_COLOR;
+    }
+    for (y = 1; y <= 18; y++)
+    {
+        RIA.addr0 = PICKER_HANDLE_DATA + PICKER_COLLAPSED_WIDTH * y + PICKER_HANDLE_X;
+        for (x = 0; x < PICKER_BUTTON_SIZE; x++)
+            RIA.rw0 = PICKER_PANEL_COLOR;
+    }
+    for (i = 0; i < 4; i++)
+    {
+        y = 5 + i * 3;
+        RIA.addr0 = PICKER_HANDLE_DATA + PICKER_COLLAPSED_WIDTH * y + PICKER_HANDLE_X + 3;
+        for (x = PICKER_HANDLE_X + 3; x <= PICKER_HANDLE_X + PICKER_BUTTON_SIZE - 4; x++)
+            RIA.rw0 = PICKER_FG_COLOR;
+    }
+}
+
 static void draw_picker(void)
 {
     int i;
@@ -3562,13 +3588,19 @@ static void draw_picker(void)
     draw_picker_status();
 }
 
+static int picker_current_width(void)
+{
+    return picker_collapsed ? PICKER_COLLAPSED_WIDTH : PICKER_WIDTH;
+}
+
 static void move_picker(int x, int y)
 {
+    int pw = picker_current_width();
     picker_x = x;
     picker_y = y;
     if (picker_x < 0) picker_x = 0;
-    if (picker_x > (int)GFX_CANVAS_WIDTH - PICKER_WIDTH)
-        picker_x = (int)GFX_CANVAS_WIDTH - PICKER_WIDTH;
+    if (picker_x > (int)GFX_CANVAS_WIDTH - pw)
+        picker_x = (int)GFX_CANVAS_WIDTH - pw;
     if (picker_y < 0) picker_y = 0;
     if (picker_y > (int)GFX_CANVAS_HEIGHT - PICKER_HEIGHT)
         picker_y = (int)GFX_CANVAS_HEIGHT - PICKER_HEIGHT;
@@ -3581,13 +3613,14 @@ static void move_picker(int x, int y)
 static int picker_num(int x, int y)
 {
     int shape;
+    int pw = picker_current_width();
     x -= picker_x;
     y -= picker_y;
-    if (x < 0 || x >= PICKER_WIDTH || y < 0 || y >= PICKER_HEIGHT)
+    if (x < 0 || x >= pw || y < 0 || y >= PICKER_HEIGHT)
         return -1;
-    if (x < 1 || x >= PICKER_WIDTH - 1 || y < 1 || y >= PICKER_HEIGHT - 1)
+    if (x < 1 || x >= pw - 1 || y < 1 || y >= PICKER_HEIGHT - 1)
         return 99; // border
-    if (x >= PICKER_COORDS_X)
+    if (!picker_collapsed && x >= PICKER_COORDS_X)
         return 99;
     if (x >= PICKER_HANDLE_X && x < PICKER_HANDLE_X + PICKER_BUTTON_SIZE)
         return 2;
@@ -4270,6 +4303,23 @@ static void right_press(int x, int y)
         change_brush_size(1);
     if (num >= 10 && num < 10 + SHAPE_COUNT)
         change_brush_shape((uint8_t)(num - 10));
+    if (num == 2)
+    {
+        picker_collapsed = picker_collapsed ? 0u : 1u;
+        if (picker_collapsed)
+        {
+            draw_picker_handle_only();
+            xram0_struct_set(PICKER_STRUCT, vga_mode3_config_t, xram_data_ptr, PICKER_HANDLE_DATA);
+            xram0_struct_set(PICKER_STRUCT, vga_mode3_config_t, width_px, PICKER_COLLAPSED_WIDTH);
+        }
+        else
+        {
+            xram0_struct_set(PICKER_STRUCT, vga_mode3_config_t, xram_data_ptr, PICKER_DATA);
+            xram0_struct_set(PICKER_STRUCT, vga_mode3_config_t, width_px, PICKER_WIDTH);
+            draw_picker();
+        }
+        move_picker(picker_x, picker_y);
+    }
 }
 
 static void right_release(void)

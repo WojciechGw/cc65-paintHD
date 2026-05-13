@@ -37,6 +37,7 @@
 
 #define CANVAS_DATA          0x0000
 #define PICKER_DATA          0xA000
+#define PICKER_HANDLE_DATA   0xE800
 #define POINTER_DATA         0xEA00
 
 #define CANVAS_STRUCT        0xFF00
@@ -70,6 +71,7 @@
 #define PICKER_STATUS_X (PICKER_COORDS_X + PICKER_COORDS_WIDTH)
 #define PICKER_STATUS_WIDTH 162
 #define PICKER_WIDTH  (PICKER_STATUS_X + PICKER_STATUS_WIDTH + 1)
+#define PICKER_COLLAPSED_WIDTH (PICKER_HANDLE_X + PICKER_BUTTON_SIZE + 1)
 
 #define POINTER_WIDTH  15
 #define POINTER_HEIGHT 15
@@ -144,7 +146,7 @@
 #define SHAPE_SPRAY  4
 #define SHAPE_FILL   5
 
-#define FILL_QUEUE_SIZE 1024 //2048
+#define FILL_QUEUE_SIZE 896 //2048
 
 #define GFX_CANVAS_CONSOLE 0
 #define GFX_CANVAS_320x240 1
@@ -274,5 +276,6 @@ static void primitive_cancel(void);
 static void draw_rect_tool_button(void);
 static void draw_ellipse_tool_button(void);
 static void exit_primitive_mode(void);
+static void draw_picker_handle_only(void);
 
 #endif /* PAINT_HD_H */
