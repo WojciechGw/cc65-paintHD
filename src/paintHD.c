@@ -71,6 +71,7 @@ static clock_t size_click_deadline;
 static clock_t mirror_click_deadline;
 static clock_t ctrl_hover_deadline;
 static uint8_t startup_splash_pending;
+static uint8_t help_pending;
 static int g_argc;
 static char **g_argv;
 static uint8_t size_click_pending;
@@ -3323,46 +3324,36 @@ static void startup_after_click(void)
     clear_selection();
     busy_begin();
 
-    if (g_argc > 1 && strcmp(g_argv[1], "/new") != 0)
+    if (g_argc > 1)
     {
         if (LoadBMP(g_argv[1], CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
         {
             busy_end();
             set_picker_status("ERROR");
-            fprintf(stderr, "LoadBMP failed: %s\n", g_argv[1]);
             return;
         }
         save_bmp_path = g_argv[1];
     }
     else
     {
-        if (g_argc > 1)
+        fd = open(save_name, O_RDONLY);
+        if (fd >= 0)
+        {
+            close(fd);
+            if (LoadBMP(save_name, CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
+            {
+                busy_end();
+                set_picker_status("ERROR");
+                return;
+            }
+            save_bmp_path = save_name;
+            set_picker_status("RESTORED");
+        }
+        else
         {
             fill_canvas(0);
             save_bmp_path = new_name;
             save_canvas_bmp_force(new_name);
-        }
-        else
-        {
-            fd = open(save_name, O_RDONLY);
-            if (fd >= 0)
-            {
-                close(fd);
-                if (LoadBMP(save_name, CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
-                {
-                    busy_end();
-                    set_picker_status("ERROR");
-                    return;
-                }
-                save_bmp_path = save_name;
-                set_picker_status("RESTORED");
-            }
-            else
-            {
-                fill_canvas(0);
-                save_bmp_path = new_name;
-                save_canvas_bmp_force(new_name);
-            }
         }
     }
 
@@ -3838,6 +3829,15 @@ static void left_press(int x, int y)
             return;
         }
         paste_preview_cancel();
+    }
+
+    if (help_pending)
+    {
+        help_pending = 0;
+        busy_begin();
+        LoadBMP("paintHD_tmp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
+        busy_end();
+        return;
     }
 
     if (startup_splash_pending)
@@ -4457,6 +4457,7 @@ int main(int argc, char *argv[]){
     static const char default_save_name[] = "paintHD_new.bmp";
     static uint8_t prev_ctrl_a;
     static uint8_t prev_ctrl_c;
+    static uint8_t prev_ctrl_q;
     static uint8_t prev_ctrl_s;
     static uint8_t prev_ctrl_x;
     static uint8_t prev_ctrl_v;
@@ -4464,6 +4465,7 @@ int main(int argc, char *argv[]){
     static uint8_t prev_ctrl_z;
     static uint8_t prev_ctrl_alt_v;
     static uint8_t prev_escape;
+    static uint8_t prev_f1;
     static uint8_t prev_f2;
     static uint8_t prev_f3;
 
@@ -4551,6 +4553,7 @@ int main(int argc, char *argv[]){
     primitive_y2 = 0;
     prev_ctrl_a = 0;
     prev_ctrl_c = 0;
+    prev_ctrl_q = 0;
     prev_ctrl_s = 0;
     prev_ctrl_x = 0;
     prev_ctrl_v = 0;
@@ -4626,6 +4629,22 @@ if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))
         else
         {
             prev_escape = 0;
+        }
+        if (key_pressed(HID_F1))
+        {
+            if (!prev_f1)
+            {
+                save_canvas_bmp_force("paintHD_tmp.bmp");
+                busy_begin();
+                LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
+                busy_end();
+                help_pending = 1u;
+                prev_f1 = 1u;
+            }
+        }
+        else
+        {
+            prev_f1 = 0;
         }
         if (key_pressed(HID_F2))
         {
@@ -4714,6 +4733,19 @@ if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))
         else
         {
             prev_ctrl_s = 0;
+        }
+        if (key_pressed(HID_LEFT_CTRL) && !alt_pressed() && !shift_pressed() &&
+            key_pressed(HID_Q))
+        {
+            if (!prev_ctrl_q)
+            {
+                save_canvas_bmp_force("paintHD_save.bmp");
+                return 0;
+            }
+        }
+        else
+        {
+            prev_ctrl_q = 0;
         }
         if (!canvas_input_locked() && !paste_preview_active &&
             key_pressed(HID_LEFT_CTRL) && !alt_pressed() && key_pressed(HID_C))
