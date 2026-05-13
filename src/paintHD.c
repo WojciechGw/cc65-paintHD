@@ -63,6 +63,7 @@ static int primitive_x2, primitive_y2;
 static int primitive_anchor_x, primitive_anchor_y;
 static int paste_x, paste_y;
 static const char *save_bmp_path;
+static char picker_save_hover[32];
 static char picker_status[24];
 static const char *picker_hover_status;
 static clock_t picker_status_deadline;
@@ -2758,7 +2759,11 @@ static const char *picker_hover_text(int x, int y)
     if (x >= PICKER_HANDLE_X && x < PICKER_HANDLE_X + PICKER_BUTTON_SIZE)
         return "move toolbar";
     if (x >= PICKER_SAVE_X && x < PICKER_SAVE_X + PICKER_BUTTON_SIZE)
-        return "save";
+    {
+        snprintf(picker_save_hover, sizeof(picker_save_hover), "save %s",
+                 save_bmp_path ? save_bmp_path : "");
+        return picker_save_hover;
+    }
     if (x >= PICKER_SWAP_X && x < PICKER_SWAP_X + PICKER_BUTTON_SIZE)
         return "pick color";
     if (x >= PICKER_ERASE_X && x < PICKER_ERASE_X + PICKER_BUTTON_SIZE)
