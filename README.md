@@ -282,6 +282,7 @@ From left to right, the picker contains:
 
 - The handle allows the toolbar to be dragged.
 - Double-clicking the handle moves it to the top-left corner.
+- Right click the handle toggle collapse a toolbar.
 - The active tool is highlighted.
 - Disabled tools are dimmed.
 - Hovering over a toolbar icon shows a description in the status field.
