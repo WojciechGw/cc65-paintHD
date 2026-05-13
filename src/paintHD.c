@@ -76,6 +76,7 @@ static uint8_t clipboard_valid;
 static uint8_t clipboard_preview_valid;
 static uint8_t undo_count;
 static uint8_t redo_count;
+static uint8_t undo_enabled = 1u;
 static uint16_t clipboard_width;
 static uint16_t clipboard_height;
 static uint16_t clipboard_stride;
@@ -95,6 +96,8 @@ static const char clipboard_path[] = "TMP/painthd_clip.bin";
 static const char current_snapshot_path[] = "TMP/paintHD_c.bin";
 static uint8_t current_snapshot_valid;
 static uint8_t operation_cancelled;
+static uint8_t busy_mode;
+static uint8_t current_cursor;
 
 static uint8_t mouse_stack[8];
 static int16_t mouse_pos_x;
@@ -165,6 +168,28 @@ static void mouse_init(void)
     VIA.ier = 0xC0;
     xreg_ria_mouse(MOUSE_INPUT);
     set_irq(mouse_irq_fn, &mouse_stack, sizeof(mouse_stack));
+}
+
+static void draw_picker_status(void);
+static void draw_pointer(uint8_t type);
+
+static void busy_begin(void)
+{
+    busy_mode = 1u;
+    strncpy(picker_status, "PLEASE WAIT", sizeof(picker_status) - 1u);
+    picker_status[sizeof(picker_status) - 1u] = '\0';
+    picker_status_deadline = 0;
+    draw_picker_status();
+    draw_pointer(2);
+}
+
+static void busy_end(void)
+{
+    busy_mode = 0u;
+    picker_status[0] = '\0';
+    picker_status_deadline = 0;
+    draw_picker_status();
+    draw_pointer(current_cursor);
 }
 
 static void fill_canvas(uint8_t color)
@@ -310,6 +335,7 @@ static void clear_canvas_random_blocks8(void)
             state ^= 0x1C80u;
     }
 }
+
 
 static uint8_t snapshot_save_canvas(const char *path)
 {
@@ -570,6 +596,8 @@ static uint8_t snapshot_stage_current(char kind, uint8_t *dirty_stack, uint8_t *
 
 static uint8_t snapshot_refresh_current(void)
 {
+    if (!undo_enabled)
+        return 1u;
     if (!snapshot_save_canvas(current_snapshot_path))
     {
         current_snapshot_valid = 0u;
@@ -579,8 +607,11 @@ static uint8_t snapshot_refresh_current(void)
     return 1u;
 }
 
+
 static uint8_t prepare_undo_step(void)
 {
+    if (!undo_enabled)
+        return 1u;
     operation_cancel_begin();
     if (redo_count != 0u)
         snapshot_stack_clear('r', &redo_count);
@@ -600,15 +631,23 @@ static void perform_undo(void)
 {
     uint8_t dirty_value;
 
+    if (!undo_enabled)
+    {
+        set_picker_status("undo disabled");
+        return;
+    }
+    busy_begin();
     operation_cancel_begin();
     if (undo_count == 0u)
     {
+        busy_end();
         set_picker_status("no undo");
         return;
     }
     if (!snapshot_stage_current('r', redo_dirty_stack, &redo_count,
                                 canvas_dirty ? 1u : 0u))
     {
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         else
@@ -617,6 +656,7 @@ static void perform_undo(void)
     }
     if (!snapshot_stack_pop('u', undo_dirty_stack, &undo_count, &dirty_value))
     {
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         else
@@ -626,24 +666,38 @@ static void perform_undo(void)
 
     set_canvas_dirty(dirty_value);
     if (!snapshot_refresh_current() && operation_was_cancelled())
+    {
+        busy_end();
         set_picker_status("cancelled");
+    }
     else
+    {
+        busy_end();
         set_picker_status("undo");
+    }
 }
 
 static void perform_redo(void)
 {
     uint8_t dirty_value;
 
+    if (!undo_enabled)
+    {
+        set_picker_status("undo disabled");
+        return;
+    }
+    busy_begin();
     operation_cancel_begin();
     if (redo_count == 0u)
     {
+        busy_end();
         set_picker_status("no redo");
         return;
     }
     if (!snapshot_stage_current('u', undo_dirty_stack, &undo_count,
                                 canvas_dirty ? 1u : 0u))
     {
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         else
@@ -652,6 +706,7 @@ static void perform_redo(void)
     }
     if (!snapshot_stack_pop('r', redo_dirty_stack, &redo_count, &dirty_value))
     {
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         else
@@ -661,9 +716,15 @@ static void perform_redo(void)
 
     set_canvas_dirty(dirty_value);
     if (!snapshot_refresh_current() && operation_was_cancelled())
+    {
+        busy_end();
         set_picker_status("cancelled");
+    }
     else
+    {
+        busy_end();
         set_picker_status("redo");
+    }
 }
 
 static void normalize_rect(int *x1, int *y1, int *x2, int *y2)
@@ -1617,10 +1678,12 @@ static void paste_preview_begin(uint8_t transparent)
     int fd;
 
     paste_preview_cancel();
+    busy_begin();
     operation_cancel_begin();
     if (!clipboard_open_read(&fd))
     {
         clipboard_valid = 0;
+        busy_end();
         set_picker_status("NOCLIP");
         return;
     }
@@ -1628,9 +1691,11 @@ static void paste_preview_begin(uint8_t transparent)
     close(fd);
     if (operation_was_cancelled())
     {
+        busy_end();
         set_picker_status("cancelled");
         return;
     }
+    busy_end();
     selection_hide_overlay();
     paste_preview_active = true;
     paste_preview_visible = false;
@@ -1661,20 +1726,26 @@ static void clipboard_cut_selection(void)
         set_picker_status("NOSEL");
         return;
     }
+    busy_begin();
     operation_cancel_begin();
     if (!clipboard_write_selection())
     {
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         return;
     }
     if (!prepare_undo_step())
+    {
+        busy_end();
         return;
+    }
     set_canvas_dirty(true);
     canvas_modify_begin();
     fill_rect(selection_x1, selection_y1, selection_x2, selection_y2, 0);
     canvas_modify_end();
     snapshot_refresh_current();
+    busy_end();
     if (operation_was_cancelled())
         set_picker_status("cancelled");
     else
@@ -1683,13 +1754,16 @@ static void clipboard_cut_selection(void)
 
 static void clipboard_copy_selection(void)
 {
+    busy_begin();
     operation_cancel_begin();
     if (!clipboard_write_selection())
     {
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         return;
     }
+    busy_end();
     set_picker_status("COPIED");
 }
 
@@ -1718,6 +1792,7 @@ static void clipboard_paste_apply(void)
         return;
     }
 
+    busy_begin();
     width = (int)clipboard_width;
     height = (int)clipboard_height;
     paste_preview_hide();
@@ -1735,6 +1810,7 @@ static void clipboard_paste_apply(void)
             canvas_modify_end();
             set_canvas_dirty(true);
             snapshot_refresh_current();
+            busy_end();
             set_picker_status("cancelled");
             return;
         }
@@ -1746,6 +1822,7 @@ static void clipboard_paste_apply(void)
             selection_active = clip_was_active;
             canvas_modify_end();
             clipboard_valid = 0;
+            busy_end();
             set_picker_status("CLIPERR");
             return;
         }
@@ -1763,6 +1840,7 @@ static void clipboard_paste_apply(void)
     canvas_modify_end();
     set_canvas_dirty(true);
     snapshot_refresh_current();
+    busy_end();
     set_picker_status("PASTED");
 }
 
@@ -2295,6 +2373,42 @@ static void draw_line_brush(int x0, int y0, int x1, int y1)
     draw_line_brush_shape(brush_shape, x0, y0, x1, y1);
 }
 
+static void draw_freehand_brush(int x0, int y0, int x1, int y1)
+{
+    int dx, dy, ax, ay;
+    int step, dist, d2, num_steps, i;
+    long s, t;
+
+    dx = x1 - x0;
+    dy = y1 - y0;
+    ax = dx < 0 ? -dx : dx;
+    ay = dy < 0 ? -dy : dy;
+
+    s = (long)ax * ax + (long)ay * ay;
+    if (s == 0) { draw_brush_shape(brush_shape, x1, y1); return; }
+
+    /* isqrt via Newton's method */
+    dist = ax > ay ? ax : ay;
+    do {
+        d2 = (int)(s / (long)dist + dist) / 2;
+        if (d2 >= dist) break;
+        dist = d2;
+    } while (1);
+
+    step = brush_size / 2;
+    if (step < 1) step = 1;
+    num_steps = dist / step;
+
+    for (i = 1; i <= num_steps; i++)
+    {
+        t = (long)i * step;
+        draw_brush_shape(brush_shape,
+                         x0 + (int)(t * dx / dist),
+                         y0 + (int)(t * dy / dist));
+    }
+    draw_brush_shape(brush_shape, x1, y1);
+}
+
 static uint8_t primitive_stroke_shape(void)
 {
     return brush_shape == SHAPE_FILL ? SHAPE_SQUARE : brush_shape;
@@ -2409,6 +2523,7 @@ static void primitive_finish_drag(void)
     }
     primitive_hide_overlay();
     primitive_dragging = false;
+    busy_begin();
     set_canvas_dirty(true);
     operation_cancel_begin();
     canvas_modify_begin();
@@ -2419,6 +2534,7 @@ static void primitive_finish_drag(void)
     canvas_modify_end();
     snapshot_refresh_current();
     drawing_button = DRAW_BUTTON_NONE;
+    busy_end();
     if (operation_was_cancelled())
         set_picker_status("cancelled");
     else
@@ -3091,11 +3207,13 @@ static void perform_mirror_action(void)
     status_text = mirror_status_text();
     if (!prepare_undo_step())
         return;
+    busy_begin();
     set_canvas_dirty(true);
     canvas_modify_begin();
     mirror_canvas_region();
     canvas_modify_end();
     snapshot_refresh_current();
+    busy_end();
     if (operation_was_cancelled())
         set_picker_status("cancelled");
     else
@@ -3140,6 +3258,7 @@ static void save_canvas_bmp(void)
 
     if (!canvas_dirty)
         return;
+    busy_begin();
     operation_cancel_begin();
     paste_preview_hide();
     primitive_hide_overlay();
@@ -3150,6 +3269,7 @@ static void save_canvas_bmp(void)
         paste_preview_show();
         primitive_show_overlay();
         selection_show_overlay();
+        busy_end();
         if (rc == -2)
         {
             set_picker_status("cancelled");
@@ -3163,6 +3283,7 @@ static void save_canvas_bmp(void)
         paste_preview_show();
         primitive_show_overlay();
         selection_show_overlay();
+        busy_end();
         set_canvas_dirty(false);
         set_picker_status("SAVED");
     }
@@ -3172,6 +3293,7 @@ static void save_canvas_bmp_force(const char *path)
 {
     int rc;
 
+    busy_begin();
     operation_cancel_begin();
     paste_preview_hide();
     primitive_hide_overlay();
@@ -3182,6 +3304,7 @@ static void save_canvas_bmp_force(const char *path)
     paste_preview_show();
     primitive_show_overlay();
     selection_show_overlay();
+    busy_end();
 }
 
 static void startup_autoload_bmp(void)
@@ -3195,8 +3318,10 @@ static void startup_autoload_bmp(void)
         return;
     close(fd);
 
+    busy_begin();
     if (LoadBMP(autoload_name, CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
     {
+        busy_end();
         set_picker_status("ERROR");
         fprintf(stderr, "LoadBMP failed: %s\n", autoload_name);
     }
@@ -3206,6 +3331,7 @@ static void startup_autoload_bmp(void)
         snapshot_stack_clear('u', &undo_count);
         snapshot_stack_clear('r', &redo_count);
         snapshot_refresh_current();
+        busy_end();
         set_picker_status("RESTORED");
     }
 }
@@ -3641,7 +3767,12 @@ static void drawing_session_end(void)
     if (!drawing_session_active)
         return;
     drawing_session_active = false;
-    snapshot_refresh_current();
+    if (undo_enabled)
+    {
+        busy_begin();
+        snapshot_refresh_current();
+        busy_end();
+    }
     paste_preview_show();
     primitive_show_overlay();
     selection_show_overlay();
@@ -3703,11 +3834,13 @@ static void left_press(int x, int y)
                     constrain_line_axis(line_anchor_x, line_anchor_y, &x, &y);
                 if (!prepare_undo_step())
                     return;
+                busy_begin();
                 set_canvas_dirty(true);
                 canvas_modify_begin();
                 draw_line_brush(line_anchor_x, line_anchor_y, x, y);
                 canvas_modify_end();
                 snapshot_refresh_current();
+                busy_end();
                 line_anchor_x = x;
                 line_anchor_y = y;
             }
@@ -3721,11 +3854,13 @@ static void left_press(int x, int y)
                     has_line_anchor = false;
                     return;
                 }
+                busy_begin();
                 set_canvas_dirty(true);
                 canvas_modify_begin();
                 draw_brush(x, y);
                 canvas_modify_end();
                 snapshot_refresh_current();
+                busy_end();
             }
             return;
         }
@@ -3734,11 +3869,13 @@ static void left_press(int x, int y)
         {
             if (!prepare_undo_step())
                 return;
+            busy_begin();
             set_canvas_dirty(true);
             canvas_modify_begin();
             flood_fill(x, y, left_color ? 0 : 1, left_color);
             canvas_modify_end();
             snapshot_refresh_current();
+            busy_end();
             return;
         }
         left_draw_armed = 1;
@@ -3884,10 +4021,12 @@ static void left_press(int x, int y)
         }
         if (!prepare_undo_step())
             return;
+        busy_begin();
         canvas_modify_begin();
         wipe_canvas_region();
         canvas_modify_end();
         snapshot_refresh_current();
+        busy_end();
         if (!(selection_mode_active() && !selection_active))
             set_canvas_dirty(true);
     }
@@ -3898,11 +4037,13 @@ static void left_press(int x, int y)
         status_text = selection_active ? "invert selection" : "invert canvas";
         if (!prepare_undo_step())
             return;
+        busy_begin();
         set_canvas_dirty(true);
         canvas_modify_begin();
         invert_canvas_region();
         canvas_modify_end();
         snapshot_refresh_current();
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         else
@@ -3979,11 +4120,13 @@ static void right_press(int x, int y)
         {
             if (!prepare_undo_step())
                 return;
+            busy_begin();
             set_canvas_dirty(true);
             canvas_modify_begin();
             flood_fill(x, y, right_color ? 0 : 1, right_color);
             canvas_modify_end();
             snapshot_refresh_current();
+            busy_end();
             return;
         }
         right_draw_armed = 1;
@@ -4028,10 +4171,12 @@ static void right_press(int x, int y)
         }
         if (!prepare_undo_step())
             return;
+        busy_begin();
         canvas_modify_begin();
         wipe_canvas_region();
         canvas_modify_end();
         snapshot_refresh_current();
+        busy_end();
         if (!(selection_mode_active() && !selection_active))
             set_canvas_dirty(true);
     }
@@ -4042,11 +4187,13 @@ static void right_press(int x, int y)
         status_text = selection_active ? "invert selection" : "invert canvas";
         if (!prepare_undo_step())
             return;
+        busy_begin();
         set_canvas_dirty(true);
         canvas_modify_begin();
         invert_canvas_region();
         canvas_modify_end();
         snapshot_refresh_current();
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         else
@@ -4059,11 +4206,13 @@ static void right_press(int x, int y)
         status_text = mirror_status_text();
         if (!prepare_undo_step())
             return;
+        busy_begin();
         set_canvas_dirty(true);
         canvas_modify_begin();
         mirror_canvas_region();
         canvas_modify_end();
         snapshot_refresh_current();
+        busy_end();
         if (operation_was_cancelled())
             set_picker_status("cancelled");
         else
@@ -4132,7 +4281,7 @@ static void move(int x, int y)
         else
         {
             set_canvas_dirty(true);
-            draw_line_brush(line_x, line_y, x, y);
+            draw_freehand_brush(line_x, line_y, x, y);
             line_x = x;
             line_y = y;
         }
@@ -4151,6 +4300,9 @@ static void draw_pointer(uint8_t type)
         break;
     case 1:
         for (i = 0; i < sizeof(cross); i++) RIA.rw0 = cross[i];
+        break;
+    case 2:
+        for (i = 0; i < sizeof(hourglass); i++) RIA.rw0 = hourglass[i];
     }
 }
 
@@ -4158,7 +4310,6 @@ static void mouse(void)
 {
     static uint8_t mb;
     static uint8_t prev_wheel;
-    static uint8_t prev_cursor;
     static int prev_display_x = -1;
     static int prev_display_y = -1;
     clock_t now;
@@ -4198,7 +4349,8 @@ static void mouse(void)
         startup_autoload_deadline = 0;
         startup_autoload_bmp();
     }
-    if (picker_status_deadline != 0 &&
+    if (!busy_mode &&
+        picker_status_deadline != 0 &&
         now >= picker_status_deadline &&
         picker_status[0] != '\0')
     {
@@ -4230,15 +4382,23 @@ static void mouse(void)
         prev_display_y = y;
     }
 
-    set_picker_hover_status(picker_hover_text(x, y));
+    if (!canvas_input_locked() && !paste_preview_active &&
+        active_tool == TOOL_BRUSH && brush_shape != SHAPE_FILL &&
+        picker_num(x, y) < 0 && key_pressed(HID_LEFT_CTRL))
+        set_picker_hover_status(has_line_anchor ? "set end point" : "set start point");
+    else
+        set_picker_hover_status(picker_hover_text(x, y));
 
     move(x, y);
 
-    cursor = (picker_num(x, y) >= 0) ? 0 : 1;
-    if (cursor != prev_cursor)
+    if (!busy_mode)
     {
-        prev_cursor = cursor;
-        draw_pointer(cursor);
+        cursor = (picker_num(x, y) >= 0) ? 0 : 1;
+        if (cursor != current_cursor)
+        {
+            current_cursor = cursor;
+            draw_pointer(cursor);
+        }
     }
 }
 
@@ -4253,6 +4413,7 @@ int main(int argc, char *argv[]){
     static uint8_t prev_ctrl_z;
     static uint8_t prev_ctrl_alt_v;
     static uint8_t prev_escape;
+    static uint8_t prev_f2;
 
     #ifdef DEBUG
     {
@@ -4345,6 +4506,7 @@ int main(int argc, char *argv[]){
     prev_ctrl_z = 0;
     prev_ctrl_alt_v = 0;
     prev_escape = 0;
+    prev_f2 = 0;
     clipboard_valid = 0;
     clipboard_width = 0;
     clipboard_height = 0;
@@ -4434,6 +4596,19 @@ int main(int argc, char *argv[]){
         else
         {
             prev_escape = 0;
+        }
+        if (key_pressed(HID_F2))
+        {
+            if (!prev_f2)
+            {
+                undo_enabled = undo_enabled ? 0u : 1u;
+                set_picker_status(undo_enabled ? "undo ON" : "undo OFF");
+                prev_f2 = 1u;
+            }
+        }
+        else
+        {
+            prev_f2 = 0;
         }
         if (!canvas_input_locked() && !paste_preview_active &&
             key_pressed(HID_LEFT_CTRL) && !alt_pressed() && key_pressed(HID_Z))
