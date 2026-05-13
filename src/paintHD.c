@@ -69,6 +69,7 @@ static clock_t picker_status_deadline;
 static clock_t startup_autoload_deadline;
 static clock_t size_click_deadline;
 static clock_t mirror_click_deadline;
+static clock_t ctrl_hover_deadline;
 static uint8_t startup_autoload_pending;
 static uint8_t size_click_pending;
 static uint8_t mirror_click_pending;
@@ -154,9 +155,9 @@ unsigned char mouse_irq_fn(void)
 static void mouse_init(void)
 {
     // 125Hz from the VIA
-    unsigned timer_val = (ria_attr_get(RIA_ATTR_PHI2_KHZ) * 8u) - 2u;
+    // unsigned timer_val = (ria_attr_get(RIA_ATTR_PHI2_KHZ) * 8u) - 2u;
     // 200Hz from the VIA
-    // unsigned timer_val = (ria_attr_get(RIA_ATTR_PHI2_KHZ) * 5u) - 2u;
+    unsigned timer_val = (ria_attr_get(RIA_ATTR_PHI2_KHZ) * 5u) - 2u;
     // 400Hz from the VIA
     // unsigned timer_val = (ria_attr_get(RIA_ATTR_PHI2_KHZ) * 5u) / 2u - 2u;
 
@@ -4384,10 +4385,23 @@ static void mouse(void)
 
     if (!canvas_input_locked() && !paste_preview_active &&
         active_tool == TOOL_BRUSH && brush_shape != SHAPE_FILL &&
-        picker_num(x, y) < 0 && key_pressed(HID_LEFT_CTRL))
-        set_picker_hover_status(has_line_anchor ? "set end point" : "set start point");
+        picker_num(x, y) < 0 && key_pressed(HID_LEFT_CTRL) &&
+        !alt_pressed() &&
+        !key_pressed(HID_A) && !key_pressed(HID_C) && !key_pressed(HID_V) &&
+        !key_pressed(HID_X) && !key_pressed(HID_Y) && !key_pressed(HID_Z))
+    {
+        if (ctrl_hover_deadline == 0)
+            ctrl_hover_deadline = now + (clock_t)DOUBLE_CLICK_TICKS;
+        if (now >= ctrl_hover_deadline)
+            set_picker_hover_status(has_line_anchor ? "set end point" : "set start point");
+        else
+            set_picker_hover_status(picker_hover_text(x, y));
+    }
     else
+    {
+        ctrl_hover_deadline = 0;
         set_picker_hover_status(picker_hover_text(x, y));
+    }
 
     move(x, y);
 
@@ -4486,6 +4500,7 @@ int main(int argc, char *argv[]){
     size_click_pending = 0;
     mirror_click_deadline = 0;
     mirror_click_pending = 0;
+    ctrl_hover_deadline = 0;
     selection_active = false;
     selection_dragging = false;
     selection_overlay_visible = false;
@@ -4536,11 +4551,12 @@ int main(int argc, char *argv[]){
 
     if (argc > 1){
         int load_rc;
-
+        busy_begin();
         clear_selection();
         load_rc = LoadBMP(argv[1], CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
         if (load_rc != 0)
         {
+            busy_end();
             if (load_rc == -2)
                 return 0;
             fprintf(stderr, "LoadBMP failed: %s\n", argv[1]);
@@ -4550,9 +4566,11 @@ int main(int argc, char *argv[]){
         snapshot_stack_clear('u', &undo_count);
         snapshot_stack_clear('r', &redo_count);
         snapshot_refresh_current();
+        busy_end();
     }
     else
     {
+        busy_begin();
         startup_autoload_pending = 1u;
         startup_autoload_deadline = clock() + (clock_t)STARTUP_AUTOLOAD_TICKS;
     }
@@ -4604,7 +4622,7 @@ int main(int argc, char *argv[]){
             if (!prev_f2)
             {
                 undo_enabled = undo_enabled ? 0u : 1u;
-                set_picker_status(undo_enabled ? "undo ON" : "undo OFF");
+                set_picker_status(undo_enabled ? "undo ON [F2]" : "undo OFF [F2]");
                 prev_f2 = 1u;
             }
         }
