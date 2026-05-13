@@ -66,11 +66,12 @@ static const char *save_bmp_path;
 static char picker_status[24];
 static const char *picker_hover_status;
 static clock_t picker_status_deadline;
-static clock_t startup_autoload_deadline;
 static clock_t size_click_deadline;
 static clock_t mirror_click_deadline;
 static clock_t ctrl_hover_deadline;
-static uint8_t startup_autoload_pending;
+static uint8_t startup_splash_pending;
+static int g_argc;
+static char **g_argv;
 static uint8_t size_click_pending;
 static uint8_t mirror_click_pending;
 static uint8_t clipboard_valid;
@@ -2733,7 +2734,7 @@ static void set_canvas_dirty(bool dirty)
 
 static uint8_t canvas_input_locked(void)
 {
-    return startup_autoload_pending != 0;
+    return startup_splash_pending != 0;
 }
 
 static const char *picker_hover_text(int x, int y)
@@ -3308,33 +3309,63 @@ static void save_canvas_bmp_force(const char *path)
     busy_end();
 }
 
-static void startup_autoload_bmp(void)
+static void startup_after_click(void)
 {
-    static const char autoload_name[] = "painthd_save.bmp";
+    static const char save_name[] = "paintHD_save.bmp";
+    static const char new_name[]  = "paintHD_new.bmp";
     int fd;
 
     clear_selection();
-    fd = open(autoload_name, O_RDONLY);
-    if (fd < 0)
-        return;
-    close(fd);
-
     busy_begin();
-    if (LoadBMP(autoload_name, CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
+
+    if (g_argc > 1 && strcmp(g_argv[1], "/new") != 0)
     {
-        busy_end();
-        set_picker_status("ERROR");
-        fprintf(stderr, "LoadBMP failed: %s\n", autoload_name);
+        if (LoadBMP(g_argv[1], CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
+        {
+            busy_end();
+            set_picker_status("ERROR");
+            fprintf(stderr, "LoadBMP failed: %s\n", g_argv[1]);
+            return;
+        }
+        save_bmp_path = g_argv[1];
     }
     else
     {
-        set_canvas_dirty(false);
-        snapshot_stack_clear('u', &undo_count);
-        snapshot_stack_clear('r', &redo_count);
-        snapshot_refresh_current();
-        busy_end();
-        set_picker_status("RESTORED");
+        if (g_argc > 1)
+        {
+            fill_canvas(0);
+            save_bmp_path = new_name;
+            save_canvas_bmp_force(new_name);
+        }
+        else
+        {
+            fd = open(save_name, O_RDONLY);
+            if (fd >= 0)
+            {
+                close(fd);
+                if (LoadBMP(save_name, CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
+                {
+                    busy_end();
+                    set_picker_status("ERROR");
+                    return;
+                }
+                save_bmp_path = save_name;
+                set_picker_status("RESTORED");
+            }
+            else
+            {
+                fill_canvas(0);
+                save_bmp_path = new_name;
+                save_canvas_bmp_force(new_name);
+            }
+        }
     }
+
+    set_canvas_dirty(false);
+    snapshot_stack_clear('u', &undo_count);
+    snapshot_stack_clear('r', &redo_count);
+    snapshot_refresh_current();
+    busy_end();
 }
 
 // Draw shape icon 8x8 pixels 1:1 at picker pixel (px, py); invert=1 for active state
@@ -3802,6 +3833,13 @@ static void left_press(int x, int y)
             return;
         }
         paste_preview_cancel();
+    }
+
+    if (startup_splash_pending)
+    {
+        startup_splash_pending = 0;
+        startup_after_click();
+        return;
     }
 
     if (canvas_input_locked())
@@ -4343,13 +4381,6 @@ static void mouse(void)
     }
 
     now = clock();
-    if (startup_autoload_pending != 0 &&
-        now >= startup_autoload_deadline)
-    {
-        startup_autoload_pending = 0;
-        startup_autoload_deadline = 0;
-        startup_autoload_bmp();
-    }
     if (!busy_mode &&
         picker_status_deadline != 0 &&
         now >= picker_status_deadline &&
@@ -4474,9 +4505,8 @@ int main(int argc, char *argv[]){
     xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, xram_data_ptr, POINTER_DATA);
     xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, xram_palette_ptr, 0xFFFF);
 
-    save_bmp_path = default_save_name;
-    if (argc > 1)
-        save_bmp_path = argv[1];
+    g_argc = argc;
+    g_argv = argv;
 
     brush_size = 5;
     brush_shape = SHAPE_SQUARE;
@@ -4495,8 +4525,7 @@ int main(int argc, char *argv[]){
     picker_status[0] = '\0';
     picker_hover_status = 0;
     picker_status_deadline = 0;
-    startup_autoload_pending = 0;
-    startup_autoload_deadline = 0;
+    startup_splash_pending = 0;
     size_click_deadline = 0;
     size_click_pending = 0;
     mirror_click_deadline = 0;
@@ -4551,31 +4580,10 @@ int main(int argc, char *argv[]){
     move_picker(((GFX_CANVAS_WIDTH - (PICKER_WIDTH))/2), GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
     draw_pointer(0);
 
-    if (argc > 1){
-        int load_rc;
-        busy_begin();
-        clear_selection();
-        load_rc = LoadBMP(argv[1], CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
-        if (load_rc != 0)
-        {
-            busy_end();
-            if (load_rc == -2)
-                return 0;
-            fprintf(stderr, "LoadBMP failed: %s\n", argv[1]);
-            return 1;
-        }
-        set_canvas_dirty(false);
-        snapshot_stack_clear('u', &undo_count);
-        snapshot_stack_clear('r', &redo_count);
-        snapshot_refresh_current();
-        busy_end();
-    }
-    else
-    {
-        busy_begin();
-        startup_autoload_pending = 1u;
-        startup_autoload_deadline = clock() + (clock_t)STARTUP_AUTOLOAD_TICKS;
-    }
+    busy_begin();
+    LoadBMP("ROM:paintHDstart.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
+    busy_end();
+    startup_splash_pending = 1u;
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, PICKER_STRUCT, GFX_PLANE_1);
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, POINTER_STRUCT, GFX_PLANE_2);
@@ -4586,7 +4594,7 @@ int main(int argc, char *argv[]){
     {
         if (shift_pressed() && alt_pressed() && key_pressed(HID_F4))
         {
-            save_canvas_bmp_force(default_save_name);
+            save_canvas_bmp_force("painthd_save.bmp");
             return 0;
         }
         if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))

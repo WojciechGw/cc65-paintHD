@@ -110,6 +110,14 @@ Undo and redo
 - New editing operations clear the redo stack.
 - Undo and redo affect the canvas contents and restore the dirty state of the document.
 
+Start sequence
+
+- The splash screen is displayed until the user clicks LMB anywhere.
+- If argv[1] is a BMP file path, that file is loaded and used as the save target.
+- If argv[1] is /new, the canvas is cleared and saved as paintHD_new.bmp.
+- If no argument is given and paintHD_save.bmp exists, it is loaded and restored.
+- If no argument is given and paintHD_save.bmp does not exist, the canvas is cleared and saved as paintHD_new.bmp.
+
 File behavior
 
 - A BMP file may be loaded from argv[1] on startup.
