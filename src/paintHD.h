@@ -88,6 +88,7 @@
 
 #define HID_A 0x04
 #define HID_C 0x06
+#define HID_S 0x16
 #define HID_ESCAPE 0x29
 #define HID_F2 0x3B
 #define HID_F3 0x3C

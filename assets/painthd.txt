@@ -7,9 +7,20 @@ Overview
 
 - Left mouse button and right mouse button paint with opposite colors.
 - The swap icon changes which mouse button paints white and which paints black.
+
+Toolbar
+
 - The toolbar shows brush size, mouse coordinates, hover hints, and operation status.
 - The toolbar can be moved by dragging its handle.
 - Double-clicking the toolbar handle moves it to the top-left corner.
+- Double-clicking the vertical brush icon toggles between vertical and horizontal orientation.
+- Double-clicking the diagonal brush icon flips the diagonal direction between left and right.
+- Double-clicking the mirror icon toggles between vertical and horizontal mirror mode.
+- Minus and plus change brush size by one step.
+- Single click on the size field sets size to 1 px.
+- Double-click on the size field sets size to 5 px.
+- Triple-click on the size field sets size to the maximum (64 px) size.
+- The status field shows operation results, selection state, paste mode, tool changes, and hover descriptions for toolbar icons.
 
 Mouse and keyboard
 
@@ -18,18 +29,19 @@ Mouse and keyboard
 - Mouse wheel adjusts the brush size, even mid-stroke.
 - Ctrl + LMB starts and continues straight line drawing.
 - Ctrl + Shift + LMB constrains line drawing to horizontal or vertical segments.
-- Esc cancels selection mode, paste preview, primitive preview, and long operations that support cancellation.
 - Ctrl + A clears the current selection and returns to normal painting.
 - Ctrl + C copies the current selection to the clipboard file.
-- Ctrl + X copies the current selection and clears the selected area.
+- Ctrl + S saves the canvas to the current save file.
 - Ctrl + V starts opaque paste preview.
 - Shift + Ctrl + V starts transparent paste preview.
-- Ctrl + Z performs undo.
+- Ctrl + X copies the current selection and clears the selected area.
 - Ctrl + Y performs redo.
-- Alt + F4 performs an unconditional exit (no data will be saved)
-- Shift + Alt + F4 saves image in current state to painthd_save.bmp and exits.
+- Ctrl + Z performs undo.
 - F2 toggles undo on and off.
 - F3 saves the current canvas as an undo checkpoint.
+- Alt + F4 performs an unconditional exit (no data will be saved)
+- Shift + Alt + F4 saves image in current state to painthd_save.bmp and exits.
+- Esc cancels selection mode, paste preview, primitive preview, and long operations that support cancellation.
 
 Brush tools
 
@@ -37,8 +49,8 @@ Available brush shapes:
 
 - square
 - circle
-- vertical line
-- diagonal line
+- line vertical/horizontal
+- diagonal line L/R line
 - spray
 - fill
 
@@ -48,16 +60,6 @@ Brush behavior:
 - The fill tool is only available in normal brush mode.
 - Rectangle and ellipse tools are disabled when fill is selected.
 - Fill is disabled when rectangle or ellipse mode is active.
-- Double-clicking the vertical brush icon changes it between vertical and horizontal.
-- Double-clicking the diagonal brush icon flips the diagonal direction.
-
-Brush size:
-
-- Minus and plus change brush size by one step.
-- Single click on the size field sets size to 1 px.
-- Double-click on the size field sets size to 5 px.
-- Triple-click on the size field sets size to the maximum (64 px) size.
-- Mouse wheel adjusts the brush size, even mid-stroke.
 
 Primitive tools
 
@@ -101,7 +103,6 @@ Canvas operations
 - Invert selection inverts only the selected area.
 - Mirror canvas flips the full canvas horizontally or vertically.
 - Mirror selection flips only the selected area horizontally or vertically.
-- Double-clicking the mirror icon changes its mode between vertical and horizontal.
 
 Undo and redo
 
@@ -116,16 +117,6 @@ File behavior
 - If no input file is supplied, PaintHD can restore painthd_save.bmp automatically after startup.
 - The save icon is disabled until the canvas is modified.
 - Save and restore status are shown in the toolbar status field.
-
-Status field
-
-The status field is used for:
-
-- operation results such as SAVED, RESTORED, undo, redo, and cancelled
-- selection state messages
-- paste mode messages
-- mirror, invert, wipe, and tool size messages
-- hover descriptions for toolbar icons when no higher-priority status is active
 
 Notes
 

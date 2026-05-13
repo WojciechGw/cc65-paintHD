@@ -4421,6 +4421,7 @@ int main(int argc, char *argv[]){
     static const char default_save_name[] = "paintHD_new.bmp";
     static uint8_t prev_ctrl_a;
     static uint8_t prev_ctrl_c;
+    static uint8_t prev_ctrl_s;
     static uint8_t prev_ctrl_x;
     static uint8_t prev_ctrl_v;
     static uint8_t prev_ctrl_y;
@@ -4516,6 +4517,7 @@ int main(int argc, char *argv[]){
     primitive_y2 = 0;
     prev_ctrl_a = 0;
     prev_ctrl_c = 0;
+    prev_ctrl_s = 0;
     prev_ctrl_x = 0;
     prev_ctrl_v = 0;
     prev_ctrl_y = 0;
@@ -4691,6 +4693,19 @@ int main(int argc, char *argv[]){
         else
         {
             prev_ctrl_alt_v = 0;
+        }
+        if (key_pressed(HID_LEFT_CTRL) && !alt_pressed() && !shift_pressed() &&
+            key_pressed(HID_S))
+        {
+            if (!prev_ctrl_s)
+            {
+                save_canvas_bmp();
+                prev_ctrl_s = 1u;
+            }
+        }
+        else
+        {
+            prev_ctrl_s = 0;
         }
         if (!canvas_input_locked() && !paste_preview_active &&
             key_pressed(HID_LEFT_CTRL) && !alt_pressed() && key_pressed(HID_C))
