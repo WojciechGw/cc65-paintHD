@@ -4586,7 +4586,7 @@ int main(int argc, char *argv[]){
     draw_pointer(0);
 
     busy_begin();
-    LoadBMP("ROM:paintHDstart.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
+    LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
     busy_end();
     startup_splash_pending = 1u;
 
@@ -4597,12 +4597,7 @@ int main(int argc, char *argv[]){
     mouse_init();
     while (1)
     {
-        if (shift_pressed() && alt_pressed() && key_pressed(HID_F4))
-        {
-            save_canvas_bmp_force("painthd_save.bmp");
-            return 0;
-        }
-        if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))
+if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))
         {
             if (!prev_ctrl_a)
             {

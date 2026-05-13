@@ -40,7 +40,6 @@ Mouse and keyboard
 - F2 toggles undo on and off.
 - F3 saves the current canvas as an undo checkpoint.
 - Alt + F4 performs an unconditional exit (no data will be saved)
-- Shift + Alt + F4 saves image in current state to painthd_save.bmp and exits.
 - Esc cancels selection mode, paste preview, primitive preview, and long operations that support cancellation.
 
 Brush tools

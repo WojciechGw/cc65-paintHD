@@ -6,7 +6,7 @@ add_subdirectory(tools)
 
 add_executable(paintHD)
 rp6502_asset(paintHD 0x10000 assets/paintHDwallpaper.bin)
-rp6502_asset(paintHD paintHDstart.bmp assets/paintHDstart.bmp)
+rp6502_asset(paintHD paintHDhelp.bmp assets/paintHDhelp.bmp)
 rp6502_executable(paintHD DATA 0x200 RESET 0x200)
 target_sources(paintHD PRIVATE
     src/paintHD.c
