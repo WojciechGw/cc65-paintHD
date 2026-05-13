@@ -396,10 +396,10 @@ static unsigned startup_page_base(void)
 
 static void startup_page_cache_path(unsigned page, char *out)
 {
-    memcpy(out, "TMP/loader_p000.bin", STARTUP_CACHE_PATH_LEN);
-    out[26] = (char)('0' + ((page / 100u) % 10u));
-    out[27] = (char)('0' + ((page / 10u) % 10u));
-    out[28] = (char)('0' + (page % 10u));
+    memcpy(out, "./TMP/loader_p000.bin", 20u);
+    out[12] = (char)('0' + ((page / 100u) % 10u));
+    out[13] = (char)('0' + ((page / 10u) % 10u));
+    out[14] = (char)('0' + (page % 10u));
 }
 
 static void startup_clear_page_cache(void)
@@ -963,7 +963,7 @@ int main(int argc, char *argv[])
     startup_collect_bmps();
     if (startup_bmp_count == 0u)
     {
-        printf("\nno .BMP file(s)\n\n");
+        printf("\nThere are no .BMP file(s)\n\n");
         return 0;
     } else {
         startup_clear_page_cache();
@@ -980,13 +980,10 @@ int main(int argc, char *argv[])
             #ifdef DEBUG
             printf("%s\n", startup_basename(startup_bmp_names[(unsigned)selected]));
             #endif
-            ria_execl("painthd.rp6502", startup_bmp_names[(unsigned)selected], NULL);
+            ria_execl("paintHD.rp6502", startup_basename(startup_bmp_names[(unsigned)selected]), NULL);
         } else if (selected >= 0) {
-            char arg[] = "painthd_new.bmp";
-            #ifdef DEBUG
-            // printf("painthd_new.bmp\n");
-            #endif
-            ria_execl("painthd.rp6502", arg, NULL);
+            char arg[] = "paintHD_new.bmp";
+            ria_execl("paintHD.rp6502", arg, NULL);
         }
         return 0;
     }

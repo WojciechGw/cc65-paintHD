@@ -24,11 +24,21 @@ The editor itself. It provides direct mouse-based drawing, a movable toolbar
 picker, selection, clipboard operations, primitive shapes, save/restore, and
 multi-step undo/redo stored on disk.
 
+**Usage:**
+
+```
+paintHD [file.bmp]
+```
+
+- No argument: attempts to restore `paintHD_save.bmp`; if absent, creates a
+  new canvas saved as `paintHD_new.bmp`.
+- With a BMP filename: loads that file and uses it as the save target.
+
 ### `paintHDloader`
 
 A launcher for browsing BMP files in the program directory. It shows up to
 `16` thumbnails per page, supports paging with `PgUp` / `PgDn`, and launches
-`painthd.rp6502` with the selected file. Empty slots can be used to start a new
+`paintHD.rp6502` with the selected file. Empty slots can be used to start a new
 image using the default name `paintHD_new.bmp`.
 
 ## PaintHD Overview
@@ -52,12 +62,13 @@ The canvas is always monochrome:
 
 - Paint with the left mouse button using the color assigned to the left button.
 - Paint with the right mouse button using the color assigned to the right button.
+- Mouse wheel adjusts brush size, even mid-stroke.
 - Brush size can be changed from `1` to `64`.
 - Available brush shapes:
   - square
   - circle
-  - vertical line
-  - diagonal line
+  - vertical / horizontal line
+  - diagonal line (left / right)
   - spray
   - fill
 
@@ -67,7 +78,7 @@ The canvas is always monochrome:
 - Double-click the diagonal brush icon to switch between left and right diagonal.
 - Single click on the brush size field sets size to `1 px`.
 - Double-click on the brush size field sets size to `5 px`.
-- Triple-click on the brush size field sets size to the maximum size.
+- Triple-click on the brush size field sets size to the maximum size (`64 px`).
 
 ### Straight Lines
 
@@ -98,8 +109,8 @@ Rectangular selection is supported.
 - Select the selection tool to enter selection mode.
 - Drag with `LMB` to create a rectangular selection.
 - The current selection size is shown live in the status field while dragging.
-- After the selection is finished, its border remains visible.
-- Selection mode stays active until explicitly cleared.
+- After the selection is finished, its border remains visible as a dotted rectangle.
+- Clicking the selection icon again exits selection mode.
 
 When a selection exists:
 
@@ -115,10 +126,11 @@ Supported operations:
 
 - copy selection
 - cut selection
-- opaque paste
-- transparent paste
+- opaque paste (all source pixels written)
+- transparent paste (only set pixels written, zero pixels left unchanged)
 
-Paste preview follows the mouse before confirmation.
+Paste preview follows the mouse before confirmation. `LMB` confirms, `RMB` or
+`Esc` cancels.
 
 ### Canvas Operations
 
@@ -138,16 +150,23 @@ Double-clicking the mirror icon switches between them.
 
 ### Save / Restore
 
-- Save the current image to BMP.
-- Auto-restore `painthd_save.bmp` can be performed on startup when no explicit
-  file is provided.
-- If PaintHD is started with a BMP file path, saving writes back to that file.
+- Save the current image to BMP with `Ctrl + S`.
+- The save icon is disabled until the canvas is modified.
+- Auto-restore `paintHD_save.bmp` is performed on startup when no explicit
+  file argument is provided.
+- If PaintHD is started with a BMP filename, saving writes back to that file.
 
 ### Undo / Redo
 
-- Multi-step undo and redo are stored on disk.
+- Multi-step undo and redo are stored on disk (up to 255 steps each).
 - New editing operations clear the redo history.
 - Undo/redo restore both canvas content and the dirty state.
+
+### Help Screen
+
+Pressing `F1` temporarily replaces the canvas with the help image
+(`ROM:paintHDhelp.bmp`). Click `LMB` anywhere to return to the canvas.
+The current file and dirty state are not affected.
 
 ### Long Operation Cancellation
 
@@ -167,6 +186,15 @@ Long-running operations support `Esc` cancellation, including:
 - `Esc`  
   Cancels active preview/selection mode or interrupts long operations that
   support cancellation.
+
+- `F1`  
+  Show help screen. Click `LMB` to return.
+
+- `F2`  
+  Toggle undo on / off.
+
+- `F3`  
+  Save the current canvas as a manual undo checkpoint.
 
 ### Drawing
 
@@ -201,9 +229,12 @@ Long-running operations support `Esc` cancellation, including:
 - `Ctrl + Y`  
   Redo.
 
-### Program Exit
+### Save and Exit
 
-- `Alt + F10`  
+- `Ctrl + S`  
+  Save to the current save file.
+
+- `Ctrl + Q`  
   Save to `painthd_save.bmp` and exit.
 
 ## Mouse Controls
@@ -215,7 +246,10 @@ Long-running operations support `Esc` cancellation, including:
 - `RMB`  
   Paint with right-button color, cancel paste preview.
 
-- mouse move  
+- `Mouse wheel`  
+  Adjust brush size.
+
+- `Mouse move`  
   Move pointer, update paste preview, update primitive preview, update selection
   preview.
 
@@ -247,9 +281,11 @@ From left to right, the picker contains:
 ### Picker Behavior
 
 - The handle allows the toolbar to be dragged.
+- Double-clicking the handle moves it to the top-left corner.
 - The active tool is highlighted.
 - Disabled tools are dimmed.
-- Hover text appears in the status field when no higher-priority status is active.
+- Hovering over a toolbar icon shows a description in the status field.
+  Hovering over the save icon also shows the current save filename.
 - Operation results such as `SAVED`, `RESTORED`, `cancelled`, or selection size
   messages are shown in the status field.
 
@@ -277,6 +313,7 @@ From left to right, the picker contains:
 - empty slots are filled with a checker pattern
 - thumbnails are cached as ready-made `1 bpp` page buffers for faster return to
   already visited pages
+- the selected filename (without path) is passed as `argv[1]` to `paintHD.rp6502`
 
 ### Loader Controls
 
@@ -296,11 +333,14 @@ From left to right, the picker contains:
 
 ### Runtime Directories
 
+It is recommended to preserve the directory structure shown below, but it is not strictly necessary.
+
+The most important requirement is to place `paintHDloader.rp6502` and `paintHD.rp6502` in the same directory as your BMP files, and to create a `TMP` directory there as well.
+
 - `MSCx:/paintHD/`  
   Application root directory.
   
-  It is strongly recommended to preserve the directory structure.
-  ```  
+    ```  
   MSCx:/paintHD (place `paintHD.rp6502` and `paintHDloader.rp6502` here)
   + - TMP (create this directory before first use)
   ```
@@ -325,13 +365,16 @@ From left to right, the picker contains:
 - `MSCx:/paintHD/TMP/loader_p###.bin`  
   Cached loader pages with ready-made `1 bpp` thumbnails.
 
+- `paintHD_tmp.bmp`  
+  Temporary canvas file used by the F1 help screen.
+
 ### Main Image Files
 
 - `paintHD_new.bmp`  
   Default file name for a new image.
 
 - `painthd_save.bmp`  
-  Default save/restore file used by startup restore and forced exit save.
+  Default save/restore file used by startup restore and `Ctrl + Q` exit save.
 
 ## Repository Layout
 
@@ -358,4 +401,3 @@ From left to right, the picker contains:
 - The canvas uses `1 bpp`, so many tools are optimized around monochrome data.
 - Temporary disk files are an intentional part of the design to avoid pressure
   on limited RAM/BSS space.
-
