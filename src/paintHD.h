@@ -30,7 +30,7 @@
 #define ICONS_FULLSET
 #include "icons.h"
 
-#define PATHS_APP ""
+#define PATHS_APP "./"
 #define PATHS_TMP PATHS_APP "TMP/"
 #define FILES_DEFAULT_SNAPSHOT "paintHD_"
 #define PATHS_SNAPSHOT PATHS_TMP FILES_DEFAULT_SNAPSHOT
@@ -90,6 +90,7 @@
 #define HID_C 0x06
 #define HID_ESCAPE 0x29
 #define HID_F2 0x3B
+#define HID_F3 0x3C
 #define HID_F10 0x43
 #define HID_V 0x19
 #define HID_X 0x1B

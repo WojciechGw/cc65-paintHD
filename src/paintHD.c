@@ -4414,6 +4414,7 @@ int main(int argc, char *argv[]){
     static uint8_t prev_ctrl_alt_v;
     static uint8_t prev_escape;
     static uint8_t prev_f2;
+    static uint8_t prev_f3;
 
     #ifdef DEBUG
     {
@@ -4507,6 +4508,7 @@ int main(int argc, char *argv[]){
     prev_ctrl_alt_v = 0;
     prev_escape = 0;
     prev_f2 = 0;
+    prev_f3 = 0;
     clipboard_valid = 0;
     clipboard_width = 0;
     clipboard_height = 0;
@@ -4609,6 +4611,29 @@ int main(int argc, char *argv[]){
         else
         {
             prev_f2 = 0;
+        }
+        if (key_pressed(HID_F3))
+        {
+            if (!prev_f3)
+            {
+                busy_begin();
+                operation_cancel_begin();
+                if (redo_count != 0u)
+                    snapshot_stack_clear('r', &redo_count);
+                if (snapshot_stage_current('u', undo_dirty_stack, &undo_count,
+                                           canvas_dirty ? 1u : 0u))
+                {
+                    if (snapshot_save_canvas(current_snapshot_path))
+                        current_snapshot_valid = 1u;
+                }
+                busy_end();
+                set_picker_status("snapshot saved");
+                prev_f3 = 1u;
+            }
+        }
+        else
+        {
+            prev_f3 = 0;
         }
         if (!canvas_input_locked() && !paste_preview_active &&
             key_pressed(HID_LEFT_CTRL) && !alt_pressed() && key_pressed(HID_Z))
