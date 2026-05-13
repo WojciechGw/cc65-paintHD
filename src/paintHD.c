@@ -4578,6 +4578,8 @@ int main(int argc, char *argv[]){
     snapshot_stack_clear('u', &undo_count);
     snapshot_stack_clear('r', &redo_count);
 
+    f_mkdir("TMP");
+
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     #ifdef RELEASE
     PAUSE(200);

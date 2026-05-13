@@ -956,6 +956,15 @@ int main(int argc, char *argv[])
     if (argc > 0)
         startup_enter_program_dir(argv[0]);
 
+    {
+        char *tmp_path = startup_make_path(startup_program_dir, "TMP");
+        if (tmp_path != 0)
+        {
+            f_mkdir(tmp_path);
+            free(tmp_path);
+        }
+    }
+
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     xreg_ria_keyboard(KEYBOARD_INPUT);
     PAUSE(PAUSE_TICKS_START);
