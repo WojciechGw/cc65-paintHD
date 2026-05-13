@@ -4582,7 +4582,7 @@ int main(int argc, char *argv[]){
     mouse_init();
     while (1)
     {
-        if (alt_pressed() && key_pressed(HID_F10))
+        if (shift_pressed() && alt_pressed() && key_pressed(HID_F4))
         {
             save_canvas_bmp_force(default_save_name);
             return 0;
@@ -4622,7 +4622,7 @@ int main(int argc, char *argv[]){
             if (!prev_f2)
             {
                 undo_enabled = undo_enabled ? 0u : 1u;
-                set_picker_status(undo_enabled ? "undo ON [F2]" : "undo OFF [F2]");
+                set_picker_status(undo_enabled ? "undo ON" : "undo OFF");
                 prev_f2 = 1u;
             }
         }
@@ -4680,7 +4680,7 @@ int main(int argc, char *argv[]){
             prev_ctrl_y = 0;
         }
         if (!canvas_input_locked() && !paste_preview_active &&
-            key_pressed(HID_LEFT_CTRL) && alt_pressed() && key_pressed(HID_V))
+            key_pressed(HID_LEFT_CTRL) && shift_pressed() && key_pressed(HID_V))
         {
             if (!prev_ctrl_alt_v)
             {

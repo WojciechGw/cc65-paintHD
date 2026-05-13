@@ -15,6 +15,7 @@ Mouse and keyboard
 
 - LMB paints with the color assigned to the left button.
 - RMB paints with the color assigned to the right button.
+- Mouse wheel adjusts the brush size, even mid-stroke.
 - Ctrl + LMB starts and continues straight line drawing.
 - Ctrl + Shift + LMB constrains line drawing to horizontal or vertical segments.
 - Esc cancels selection mode, paste preview, primitive preview, and long operations that support cancellation.
@@ -22,10 +23,13 @@ Mouse and keyboard
 - Ctrl + C copies the current selection to the clipboard file.
 - Ctrl + X copies the current selection and clears the selected area.
 - Ctrl + V starts opaque paste preview.
-- Ctrl + Alt + V starts transparent paste preview.
+- Shift + Ctrl + V starts transparent paste preview.
 - Ctrl + Z performs undo.
 - Ctrl + Y performs redo.
-- Alt + F10 saves to painthd_save.bmp and exits.
+- Alt + F4 performs an unconditional exit (no data will be saved)
+- Shift + Alt + F4 saves image in current state to painthd_save.bmp and exits.
+- F2 toggles undo on and off.
+- F3 saves the current canvas as an undo checkpoint.
 
 Brush tools
 
@@ -47,12 +51,13 @@ Brush behavior:
 - Double-clicking the vertical brush icon changes it between vertical and horizontal.
 - Double-clicking the diagonal brush icon flips the diagonal direction.
 
-Brush size
+Brush size:
 
 - Minus and plus change brush size by one step.
 - Single click on the size field sets size to 1 px.
 - Double-click on the size field sets size to 5 px.
-- Triple-click on the size field sets size to the maximum size.
+- Triple-click on the size field sets size to the maximum (64 px) size.
+- Mouse wheel adjusts the brush size, even mid-stroke.
 
 Primitive tools
 
@@ -100,7 +105,7 @@ Canvas operations
 
 Undo and redo
 
-- PaintHD keeps multi-step undo and redo history on disk.
+- PaintHD keeps up to 255 undo and redo steps on disk.
 - New editing operations clear the redo stack.
 - Undo and redo affect the canvas contents and restore the dirty state of the document.
 
