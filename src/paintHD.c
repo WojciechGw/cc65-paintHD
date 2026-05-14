@@ -32,6 +32,7 @@ static uint8_t active_tool;
 static bool is_drawing;
 static bool is_dragging;
 static bool has_line_anchor;
+static bool ctrl_line_session_active;
 static bool canvas_dirty;
 static bool drawing_session_active;
 static bool vert_brush_flipped;
@@ -3732,6 +3733,7 @@ static void change_active_tool(uint8_t tool)
     if (primitive_dragging)
         primitive_cancel();
     has_line_anchor = false;
+    ctrl_line_session_active = false;
     old_shape = brush_shape;
     active_tool = tool;
     draw_select_button();
@@ -3755,6 +3757,7 @@ static void exit_selection_mode(void)
     left_draw_armed = 0;
     right_draw_armed = 0;
     has_line_anchor = false;
+    ctrl_line_session_active = false;
     draw_select_button();
     draw_shape_button(brush_shape);
     set_picker_status("selection cleared");
@@ -3893,12 +3896,14 @@ static void left_press(int x, int y)
         if (active_tool == TOOL_SELECT)
         {
             has_line_anchor = false;
+            ctrl_line_session_active = false;
             selection_begin_drag(x, y);
             return;
         }
         if (active_tool == TOOL_RECT || active_tool == TOOL_ELLIPSE)
         {
             has_line_anchor = false;
+            ctrl_line_session_active = false;
             primitive_begin_drag(active_tool, DRAW_BUTTON_LEFT, left_color, x, y);
             return;
         }
@@ -3909,14 +3914,11 @@ static void left_press(int x, int y)
             {
                 if (shift_pressed())
                     constrain_line_axis(line_anchor_x, line_anchor_y, &x, &y);
-                if (!prepare_undo_step())
-                    return;
                 busy_begin();
                 set_canvas_dirty(true);
                 canvas_modify_begin();
                 draw_line_brush(line_anchor_x, line_anchor_y, x, y);
                 canvas_modify_end();
-                snapshot_refresh_current();
                 busy_end();
                 line_anchor_x = x;
                 line_anchor_y = y;
@@ -3924,11 +3926,13 @@ static void left_press(int x, int y)
             else
             {
                 has_line_anchor = true;
+                ctrl_line_session_active = true;
                 line_anchor_x = x;
                 line_anchor_y = y;
                 if (!prepare_undo_step())
                 {
                     has_line_anchor = false;
+                    ctrl_line_session_active = false;
                     return;
                 }
                 busy_begin();
@@ -3936,12 +3940,12 @@ static void left_press(int x, int y)
                 canvas_modify_begin();
                 draw_brush(x, y);
                 canvas_modify_end();
-                snapshot_refresh_current();
                 busy_end();
             }
             return;
         }
         has_line_anchor = false;
+        ctrl_line_session_active = false;
         if (brush_shape == SHAPE_FILL)
         {
             if (!prepare_undo_step())
@@ -3987,6 +3991,7 @@ static void left_press(int x, int y)
     {
         last_drag_click = 0;
         has_line_anchor = false;
+        ctrl_line_session_active = false;
     }
     if (num == 9)
     {
@@ -4183,6 +4188,7 @@ static void right_press(int x, int y)
     }
 
     has_line_anchor = false;
+    ctrl_line_session_active = false;
     if (num < 0)
     {
         if (active_tool == TOOL_SELECT)
@@ -4576,6 +4582,7 @@ int main(int argc, char *argv[]){
     left_draw_armed = 0;
     right_draw_armed = 0;
     has_line_anchor = false;
+    ctrl_line_session_active = false;
     canvas_dirty = false;
     drawing_session_active = false;
     picker_status[0] = '\0';
