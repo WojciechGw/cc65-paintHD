@@ -4316,7 +4316,6 @@ static void right_press(int x, int y)
         {
             xram0_struct_set(PICKER_STRUCT, vga_mode3_config_t, xram_data_ptr, PICKER_DATA);
             xram0_struct_set(PICKER_STRUCT, vga_mode3_config_t, width_px, PICKER_WIDTH);
-            draw_picker();
         }
         move_picker(picker_x, picker_y);
     }
