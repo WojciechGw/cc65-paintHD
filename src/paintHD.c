@@ -1710,9 +1710,9 @@ static void paste_preview_begin(uint8_t transparent)
     paste_y = mouse_pos_y;
     paste_preview_show();
     if (paste_transparent)
-        set_picker_status("paste transparent");
+        set_picker_status("paste transparent (LMB)");
     else
-        set_picker_status("paste");
+        set_picker_status("paste (LMB)");
 }
 
 static void paste_preview_move(int x, int y)
@@ -2246,12 +2246,18 @@ static uint8_t draw_line_square_fast(int x0, int y0, int x1, int y1)
 
     if (y0 == y1)
     {
-        fill_rect(x0 - half, y0 - half, x1 + half, y0 + half, active_color);
+        fill_rect(
+            (x0 < x1 ? x0 : x1) - half, y0 - half,
+            (x0 < x1 ? x1 : x0) + half, y0 + half,
+            active_color);
         return 1u;
     }
     if (x0 == x1)
     {
-        fill_rect(x0 - half, y0 - half, x0 + half, y1 + half, active_color);
+        fill_rect(
+            x0 - half, (y0 < y1 ? y0 : y1) - half,
+            x0 + half, (y0 < y1 ? y1 : y0) + half,
+            active_color);
         return 1u;
     }
     return 0u;
@@ -2267,7 +2273,10 @@ static uint8_t draw_line_vert_fast(int x0, int y0, int x1, int y1)
     {
         if (y0 == y1)
         {
-            fill_rect(x0 - half, y0, x1 + half, y0, active_color);
+            fill_rect(
+                (x0 < x1 ? x0 : x1) - half, y0,
+                (x0 < x1 ? x1 : x0) + half, y0,
+                active_color);
             return 1u;
         }
         return 0u;
@@ -2276,7 +2285,10 @@ static uint8_t draw_line_vert_fast(int x0, int y0, int x1, int y1)
     {
         if (x0 == x1)
         {
-            fill_rect(x0, y0 - half, x0, y1 + half, active_color);
+            fill_rect(
+                x0, (y0 < y1 ? y0 : y1) - half,
+                x0, (y0 < y1 ? y1 : y0) + half,
+                active_color);
             return 1u;
         }
         return 0u;
@@ -3909,39 +3921,30 @@ static void left_press(int x, int y)
         }
         if (key_pressed(HID_LEFT_CTRL) && brush_shape != SHAPE_FILL)
         {
-            active_color = left_color;
-            if (has_line_anchor)
-            {
-                if (shift_pressed())
-                    constrain_line_axis(line_anchor_x, line_anchor_y, &x, &y);
-                busy_begin();
-                set_canvas_dirty(true);
-                canvas_modify_begin();
-                draw_line_brush(line_anchor_x, line_anchor_y, x, y);
-                canvas_modify_end();
-                busy_end();
-                line_anchor_x = x;
-                line_anchor_y = y;
-            }
-            else
+            if (!has_line_anchor)
             {
                 has_line_anchor = true;
-                ctrl_line_session_active = true;
                 line_anchor_x = x;
                 line_anchor_y = y;
-                if (!prepare_undo_step())
-                {
-                    has_line_anchor = false;
-                    ctrl_line_session_active = false;
-                    return;
-                }
-                busy_begin();
-                set_canvas_dirty(true);
-                canvas_modify_begin();
-                draw_brush(x, y);
-                canvas_modify_end();
-                busy_end();
+                return;
             }
+            active_color = left_color;
+            if (shift_pressed())
+                constrain_line_axis(line_anchor_x, line_anchor_y, &x, &y);
+            if (!ctrl_line_session_active)
+            {
+                if (!prepare_undo_step())
+                    return;
+                ctrl_line_session_active = true;
+            }
+            busy_begin();
+            set_canvas_dirty(true);
+            canvas_modify_begin();
+            draw_line_brush(line_anchor_x, line_anchor_y, x, y);
+            canvas_modify_end();
+            busy_end();
+            line_anchor_x = x;
+            line_anchor_y = y;
             return;
         }
         has_line_anchor = false;
@@ -4157,6 +4160,13 @@ static void left_release(void)
         }
         else
         {
+            if (is_drawing)
+            {
+                has_line_anchor = true;
+                ctrl_line_session_active = false;
+                line_anchor_x = line_x;
+                line_anchor_y = line_y;
+            }
             drawing_button = DRAW_BUTTON_NONE;
             is_drawing = false;
             drawing_session_end();
@@ -4484,13 +4494,29 @@ static void mouse(void)
         if (ctrl_hover_deadline == 0)
             ctrl_hover_deadline = now + (clock_t)DOUBLE_CLICK_TICKS;
         if (now >= ctrl_hover_deadline)
-            set_picker_hover_status(has_line_anchor ? "set end point" : "set start point");
+        {
+            if (!has_line_anchor)
+            {
+                has_line_anchor = true;
+                line_anchor_x = x;
+                line_anchor_y = y;
+            }
+            set_picker_hover_status("choose end point");
+        }
         else
             set_picker_hover_status(picker_hover_text(x, y));
     }
     else
     {
         ctrl_hover_deadline = 0;
+        if (ctrl_line_session_active)
+        {
+            ctrl_line_session_active = false;
+            has_line_anchor = false;
+            busy_begin();
+            snapshot_refresh_current();
+            busy_end();
+        }
         set_picker_hover_status(picker_hover_text(x, y));
     }
 
