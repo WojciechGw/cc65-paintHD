@@ -46,6 +46,13 @@ static bool primitive_overlay_visible;
 static bool paste_preview_active;
 static bool paste_preview_visible;
 static bool paste_transparent;
+static bool crosshair_active;
+static bool crosshair_visible;
+static int crosshair_x;
+static int crosshair_y;
+static bool line_anchor_marker_visible;
+static int line_anchor_marker_x;
+static int line_anchor_marker_y;
 static uint8_t drawing_button;
 static uint8_t left_draw_armed;
 static uint8_t right_draw_armed;
@@ -88,8 +95,8 @@ static uint16_t clipboard_height;
 static uint16_t clipboard_stride;
 static uint16_t clipboard_preview_top;
 static uint16_t clipboard_preview_bottom;
-static uint16_t clipboard_preview_left[GFX_CANVAS_HEIGHT];
-static uint16_t clipboard_preview_right[GFX_CANVAS_HEIGHT];
+static uint16_t clipboard_preview_left_x;
+static uint16_t clipboard_preview_right_x;
 static uint16_t primitive_ellipse_left[GFX_CANVAS_HEIGHT];
 static uint16_t primitive_ellipse_right[GFX_CANVAS_HEIGHT];
 static uint8_t clipboard_row[CANVAS_STRIDE];
@@ -343,6 +350,11 @@ static void clear_canvas_random_blocks8(void)
 }
 
 
+static void crosshair_hide(void);
+static void crosshair_show(void);
+static void line_anchor_hide_marker(void);
+static void line_anchor_show_marker(void);
+
 static uint8_t snapshot_save_canvas(const char *path)
 {
     uint8_t selection_was_visible;
@@ -356,6 +368,8 @@ static uint8_t snapshot_save_canvas(const char *path)
     selection_was_visible = selection_overlay_visible ? 1u : 0u;
     primitive_was_visible = primitive_overlay_visible ? 1u : 0u;
     paste_was_visible = paste_preview_visible ? 1u : 0u;
+    line_anchor_hide_marker();
+    crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
     selection_hide_overlay();
@@ -369,6 +383,9 @@ static uint8_t snapshot_save_canvas(const char *path)
             primitive_show_overlay();
         if (paste_was_visible)
             paste_preview_show();
+        crosshair_show();
+        if (has_line_anchor)
+            line_anchor_show_marker();
         return 0;
     }
 
@@ -385,6 +402,9 @@ static uint8_t snapshot_save_canvas(const char *path)
                 primitive_show_overlay();
             if (paste_was_visible)
                 paste_preview_show();
+            crosshair_show();
+            if (has_line_anchor)
+                line_anchor_show_marker();
             return 0;
         }
         chunk = (remaining > 0x7FFFu) ? 0x7FFFu : (unsigned)remaining;
@@ -397,6 +417,9 @@ static uint8_t snapshot_save_canvas(const char *path)
                 primitive_show_overlay();
             if (paste_was_visible)
                 paste_preview_show();
+            crosshair_show();
+            if (has_line_anchor)
+                line_anchor_show_marker();
             return 0;
         }
         addr += (uint16_t)chunk;
@@ -410,6 +433,9 @@ static uint8_t snapshot_save_canvas(const char *path)
         primitive_show_overlay();
     if (paste_was_visible)
         paste_preview_show();
+    crosshair_show();
+    if (has_line_anchor)
+        line_anchor_show_marker();
     return 1u;
 }
 
@@ -426,6 +452,8 @@ static uint8_t snapshot_load_canvas(const char *path)
     selection_was_visible = selection_overlay_visible ? 1u : 0u;
     primitive_was_visible = primitive_overlay_visible ? 1u : 0u;
     paste_was_visible = paste_preview_visible ? 1u : 0u;
+    line_anchor_hide_marker();
+    crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
     selection_hide_overlay();
@@ -439,6 +467,9 @@ static uint8_t snapshot_load_canvas(const char *path)
             primitive_show_overlay();
         if (paste_was_visible)
             paste_preview_show();
+        crosshair_show();
+        if (has_line_anchor)
+            line_anchor_show_marker();
         return 0;
     }
 
@@ -455,6 +486,9 @@ static uint8_t snapshot_load_canvas(const char *path)
                 primitive_show_overlay();
             if (paste_was_visible)
                 paste_preview_show();
+            crosshair_show();
+            if (has_line_anchor)
+                line_anchor_show_marker();
             return 0;
         }
         chunk = (remaining > 0x7FFFu) ? 0x7FFFu : (unsigned)remaining;
@@ -467,6 +501,9 @@ static uint8_t snapshot_load_canvas(const char *path)
                 primitive_show_overlay();
             if (paste_was_visible)
                 paste_preview_show();
+            crosshair_show();
+            if (has_line_anchor)
+                line_anchor_show_marker();
             return 0;
         }
         addr += (uint16_t)chunk;
@@ -480,6 +517,9 @@ static uint8_t snapshot_load_canvas(const char *path)
         primitive_show_overlay();
     if (paste_was_visible)
         paste_preview_show();
+    crosshair_show();
+    if (has_line_anchor)
+        line_anchor_show_marker();
     return 1u;
 }
 
@@ -1451,11 +1491,8 @@ static void clipboard_build_preview_outline(int fd)
     clipboard_preview_valid = 0u;
     clipboard_preview_top = clipboard_height;
     clipboard_preview_bottom = 0u;
-    for (y = 0; y < (int)clipboard_height; y++)
-    {
-        clipboard_preview_left[y] = clipboard_width;
-        clipboard_preview_right[y] = 0u;
-    }
+    clipboard_preview_left_x = clipboard_width;
+    clipboard_preview_right_x = 0u;
 
     for (y = 0; y < (int)clipboard_height; y++)
     {
@@ -1476,10 +1513,12 @@ static void clipboard_build_preview_outline(int fd)
             right = (uint16_t)x;
         }
 
-        clipboard_preview_left[y] = left;
-        clipboard_preview_right[y] = right;
         if (left != clipboard_width)
         {
+            if (left < clipboard_preview_left_x)
+                clipboard_preview_left_x = left;
+            if (right > clipboard_preview_right_x)
+                clipboard_preview_right_x = right;
             if (!clipboard_preview_valid)
             {
                 clipboard_preview_top = (uint16_t)y;
@@ -1584,7 +1623,6 @@ static void paste_preview_toggle_overlay(void)
     int y2;
     int x;
     int y;
-    int row;
     int px1;
     int px2;
 
@@ -1621,34 +1659,31 @@ static void paste_preview_toggle_overlay(void)
     if (!clipboard_preview_valid)
         return;
 
-    for (row = (int)clipboard_preview_top; row <= (int)clipboard_preview_bottom; row++)
+    px1 = paste_x + (int)clipboard_preview_left_x;
+    px2 = paste_x + (int)clipboard_preview_right_x;
+    y1 = paste_y + (int)clipboard_preview_top;
+    y2 = paste_y + (int)clipboard_preview_bottom;
+
+    if (px1 < 0) px1 = 0;
+    if (y1 < 0) y1 = 0;
+    if (px2 >= (int)GFX_CANVAS_WIDTH)  px2 = (int)GFX_CANVAS_WIDTH - 1;
+    if (y2 >= (int)GFX_CANVAS_HEIGHT)  y2 = (int)GFX_CANVAS_HEIGHT - 1;
+
+    if (px1 <= px2 && y1 <= y2)
     {
-        if (clipboard_preview_left[row] == clipboard_width)
-            continue;
-
-        y = paste_y + row;
-        if (y < 0 || y >= (int)GFX_CANVAS_HEIGHT)
-            continue;
-
-        px1 = paste_x + (int)clipboard_preview_left[row];
-        px2 = paste_x + (int)clipboard_preview_right[row];
-
-        if (px1 >= 0 && px1 < (int)GFX_CANVAS_WIDTH && paste_preview_pixel(px1, y))
-            raw_toggle_pixel(px1, y);
-        if (px2 != px1 &&
-            px2 >= 0 && px2 < (int)GFX_CANVAS_WIDTH &&
-            paste_preview_pixel(px2, y))
-            raw_toggle_pixel(px2, y);
-
-        if (row == (int)clipboard_preview_top || row == (int)clipboard_preview_bottom)
+        for (x = px1; x <= px2; x++)
         {
-            if (px1 < 0) px1 = 0;
-            if (px2 >= (int)GFX_CANVAS_WIDTH) px2 = (int)GFX_CANVAS_WIDTH - 1;
-            for (x = px1; x <= px2; x++)
-            {
-                if (paste_preview_pixel(x, y))
-                    raw_toggle_pixel(x, y);
-            }
+            if (paste_preview_pixel(x, y1))
+                raw_toggle_pixel(x, y1);
+            if (y2 != y1 && paste_preview_pixel(x, y2))
+                raw_toggle_pixel(x, y2);
+        }
+        for (y = y1 + 1; y < y2; y++)
+        {
+            if (paste_preview_pixel(px1, y))
+                raw_toggle_pixel(px1, y);
+            if (px2 != px1 && paste_preview_pixel(px2, y))
+                raw_toggle_pixel(px2, y);
         }
     }
 }
@@ -1667,6 +1702,63 @@ static void paste_preview_show(void)
         return;
     paste_preview_toggle_overlay();
     paste_preview_visible = true;
+}
+
+static void crosshair_toggle_overlay(void)
+{
+    int i;
+    for (i = 0; i < (int)GFX_CANVAS_WIDTH; i += 8)
+        raw_toggle_pixel(i, crosshair_y);
+    for (i = 0; i < (int)GFX_CANVAS_HEIGHT; i += 8)
+        raw_toggle_pixel(crosshair_x, i);
+}
+
+static void crosshair_hide(void)
+{
+    if (!crosshair_visible)
+        return;
+    crosshair_toggle_overlay();
+    crosshair_visible = false;
+}
+
+static void crosshair_show(void)
+{
+    if (!crosshair_active || crosshair_visible)
+        return;
+    crosshair_x = mouse_pos_x;
+    crosshair_y = mouse_pos_y;
+    crosshair_toggle_overlay();
+    crosshair_visible = true;
+}
+
+static void line_anchor_toggle_marker(void)
+{
+    int d;
+    for (d = 1; d <= 4; d++)
+    {
+        raw_toggle_pixel(line_anchor_marker_x - d, line_anchor_marker_y - d);
+        raw_toggle_pixel(line_anchor_marker_x + d, line_anchor_marker_y - d);
+        raw_toggle_pixel(line_anchor_marker_x - d, line_anchor_marker_y + d);
+        raw_toggle_pixel(line_anchor_marker_x + d, line_anchor_marker_y + d);
+    }
+}
+
+static void line_anchor_hide_marker(void)
+{
+    if (!line_anchor_marker_visible)
+        return;
+    line_anchor_toggle_marker();
+    line_anchor_marker_visible = false;
+}
+
+static void line_anchor_show_marker(void)
+{
+    if (line_anchor_marker_visible)
+        return;
+    line_anchor_marker_x = line_anchor_x;
+    line_anchor_marker_y = line_anchor_y;
+    line_anchor_toggle_marker();
+    line_anchor_marker_visible = true;
 }
 
 static void paste_preview_cancel(void)
@@ -3276,6 +3368,7 @@ static void save_canvas_bmp(void)
         return;
     busy_begin();
     operation_cancel_begin();
+    crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
     selection_hide_overlay();
@@ -3285,6 +3378,7 @@ static void save_canvas_bmp(void)
         paste_preview_show();
         primitive_show_overlay();
         selection_show_overlay();
+        crosshair_show();
         busy_end();
         if (rc == -2)
         {
@@ -3299,6 +3393,7 @@ static void save_canvas_bmp(void)
         paste_preview_show();
         primitive_show_overlay();
         selection_show_overlay();
+        crosshair_show();
         busy_end();
         set_canvas_dirty(false);
         set_picker_status("SAVED");
@@ -3311,6 +3406,7 @@ static void save_canvas_bmp_force(const char *path)
 
     busy_begin();
     operation_cancel_begin();
+    crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
     selection_hide_overlay();
@@ -3320,6 +3416,7 @@ static void save_canvas_bmp_force(const char *path)
     paste_preview_show();
     primitive_show_overlay();
     selection_show_overlay();
+    crosshair_show();
     busy_end();
 }
 
@@ -3738,6 +3835,7 @@ static void change_active_tool(uint8_t tool)
         return;
     if (primitive_dragging)
         primitive_cancel();
+    line_anchor_hide_marker();
     has_line_anchor = false;
     ctrl_line_session_active = false;
     old_shape = brush_shape;
@@ -3762,6 +3860,7 @@ static void exit_selection_mode(void)
     is_drawing = false;
     left_draw_armed = 0;
     right_draw_armed = 0;
+    line_anchor_hide_marker();
     has_line_anchor = false;
     ctrl_line_session_active = false;
     draw_select_button();
@@ -3810,6 +3909,8 @@ static void toggle_vert_brush_flip(void)
 
 static void canvas_modify_begin(void)
 {
+    line_anchor_hide_marker();
+    crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
     selection_hide_overlay();
@@ -3820,12 +3921,15 @@ static void canvas_modify_end(void)
     paste_preview_show();
     primitive_show_overlay();
     selection_show_overlay();
+    crosshair_show();
 }
 
 static void drawing_session_begin(void)
 {
     if (drawing_session_active)
         return;
+    line_anchor_hide_marker();
+    crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
     selection_hide_overlay();
@@ -3846,6 +3950,7 @@ static void drawing_session_end(void)
     paste_preview_show();
     primitive_show_overlay();
     selection_show_overlay();
+    crosshair_show();
 }
 
 static void left_press(int x, int y)
@@ -3901,6 +4006,7 @@ static void left_press(int x, int y)
         left_draw_armed = 0;
         if (active_tool == TOOL_SELECT)
         {
+            line_anchor_hide_marker();
             has_line_anchor = false;
             ctrl_line_session_active = false;
             selection_begin_drag(x, y);
@@ -3908,6 +4014,7 @@ static void left_press(int x, int y)
         }
         if (active_tool == TOOL_RECT || active_tool == TOOL_ELLIPSE)
         {
+            line_anchor_hide_marker();
             has_line_anchor = false;
             ctrl_line_session_active = false;
             primitive_begin_drag(active_tool, DRAW_BUTTON_LEFT, left_color, x, y);
@@ -3920,6 +4027,8 @@ static void left_press(int x, int y)
                 has_line_anchor = true;
                 line_anchor_x = x;
                 line_anchor_y = y;
+                line_anchor_show_marker();
+                set_picker_hover_status("set end point");
                 return;
             }
             active_color = left_color;
@@ -3937,10 +4046,13 @@ static void left_press(int x, int y)
             draw_line_brush(line_anchor_x, line_anchor_y, x, y);
             canvas_modify_end();
             busy_end();
+            set_picker_status("drawing line");
             line_anchor_x = x;
             line_anchor_y = y;
+            line_anchor_show_marker();
             return;
         }
+        line_anchor_hide_marker();
         has_line_anchor = false;
         ctrl_line_session_active = false;
         if (brush_shape == SHAPE_FILL)
@@ -3987,6 +4099,7 @@ static void left_press(int x, int y)
     else
     {
         last_drag_click = 0;
+        line_anchor_hide_marker();
         has_line_anchor = false;
         ctrl_line_session_active = false;
     }
@@ -4169,6 +4282,29 @@ static void left_release(void)
     is_dragging = false;
 }
 
+static void ctrl_right_press(int x, int y)
+{
+    active_color = right_color;
+    if (shift_pressed())
+        constrain_line_axis(line_anchor_x, line_anchor_y, &x, &y);
+    if (!ctrl_line_session_active)
+    {
+        if (!prepare_undo_step())
+            return;
+        ctrl_line_session_active = true;
+    }
+    busy_begin();
+    set_canvas_dirty(true);
+    canvas_modify_begin();
+    draw_line_brush(line_anchor_x, line_anchor_y, x, y);
+    canvas_modify_end();
+    busy_end();
+    set_picker_status("drawing line");
+    line_anchor_x = x;
+    line_anchor_y = y;
+    line_anchor_show_marker();
+}
+
 static void right_press(int x, int y)
 {
     int num = picker_num(x, y);
@@ -4191,6 +4327,13 @@ static void right_press(int x, int y)
             return;
     }
 
+    if (key_pressed(HID_LEFT_CTRL) && brush_shape != SHAPE_FILL &&
+        has_line_anchor && num < 0 && !canvas_input_locked())
+    {
+        ctrl_right_press(x, y);
+        return;
+    }
+    line_anchor_hide_marker();
     has_line_anchor = false;
     ctrl_line_session_active = false;
     if (num < 0)
@@ -4455,6 +4598,19 @@ static void mouse(void)
     if (released & 1) left_release();
     if (pressed & 2)  right_press(x, y);
     if (released & 2) right_release();
+    if (pressed & 4)
+    {
+        if (crosshair_active)
+        {
+            crosshair_hide();
+            crosshair_active = false;
+        }
+        else
+        {
+            crosshair_active = true;
+            crosshair_show();
+        }
+    }
 
     RIA.addr0 = MOUSE_INPUT_WHEEL;
     rw = RIA.rw0;
@@ -4493,6 +4649,11 @@ static void mouse(void)
 
     if (x != prev_display_x || y != prev_display_y)
     {
+        if (crosshair_visible)
+        {
+            crosshair_hide();
+            crosshair_show();
+        }
         draw_mouse_coords(x, y);
         prev_display_x = x;
         prev_display_y = y;
@@ -4505,24 +4666,16 @@ static void mouse(void)
         !key_pressed(HID_A) && !key_pressed(HID_C) && !key_pressed(HID_V) &&
         !key_pressed(HID_X) && !key_pressed(HID_Y) && !key_pressed(HID_Z))
     {
-        if (ctrl_hover_deadline == 0)
-            ctrl_hover_deadline = now + (clock_t)DOUBLE_CLICK_TICKS;
-        if (now >= ctrl_hover_deadline)
-        {
-            if (!has_line_anchor)
-            {
-                has_line_anchor = true;
-                line_anchor_x = x;
-                line_anchor_y = y;
-            }
-            set_picker_hover_status("choose end point");
-        }
+        ctrl_hover_deadline = 0;
+        if (has_line_anchor)
+            set_picker_hover_status("set end point");
         else
-            set_picker_hover_status(picker_hover_text(x, y));
+            set_picker_hover_status("set start point");
     }
     else
     {
         ctrl_hover_deadline = 0;
+        line_anchor_hide_marker();
         if (ctrl_line_session_active)
         {
             ctrl_line_session_active = false;
@@ -4531,6 +4684,8 @@ static void mouse(void)
             snapshot_refresh_current();
             busy_end();
         }
+        else
+            has_line_anchor = false;
         set_picker_hover_status(picker_hover_text(x, y));
     }
 

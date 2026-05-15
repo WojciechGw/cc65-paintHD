@@ -149,7 +149,7 @@
 #define SHAPE_SPRAY  4
 #define SHAPE_FILL   5
 
-#define FILL_QUEUE_SIZE 800 //2048
+#define FILL_QUEUE_SIZE 512 // <    - 800 <- 2048
 
 #define GFX_CANVAS_CONSOLE 0
 #define GFX_CANVAS_320x240 1
