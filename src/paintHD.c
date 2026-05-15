@@ -11,7 +11,7 @@
 
 #define RELEASE
 
-// #define WITHMALLOC
+//#define WITHMALLOC
 
 #ifdef WITHMALLOC
     void *__fastcall__ argv_mem(size_t size) { return malloc(size); }
@@ -4686,9 +4686,7 @@ int main(int argc, char *argv[]){
     move_picker(((GFX_CANVAS_WIDTH - (PICKER_WIDTH))/2), GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
     draw_pointer(POINTER_arrow);
 
-    busy_begin();
     LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
-    busy_end();
     startup_splash_pending = 1u;
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, PICKER_STRUCT, GFX_PLANE_1);
@@ -4698,7 +4696,7 @@ int main(int argc, char *argv[]){
     mouse_init();
     while (1)
     {
-if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))
+        if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))
         {
             if (!prev_ctrl_a)
             {
@@ -4733,9 +4731,7 @@ if (key_pressed(HID_LEFT_CTRL) && key_pressed(HID_A))
             if (!prev_f1)
             {
                 save_canvas_bmp_force("paintHD_tmp.bmp");
-                busy_begin();
                 LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
-                busy_end();
                 help_pending = 1u;
                 prev_f1 = 1u;
             }

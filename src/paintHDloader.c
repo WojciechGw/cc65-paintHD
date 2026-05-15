@@ -490,34 +490,6 @@ static void startup_save_page_cache(unsigned page)
     close(fd);
 }
 
-/*
-static void draw_text_char(char ch, int px, int py)
-{
-    const uint8_t *glyph;
-    unsigned char code;
-    int row;
-    int col;
-    uint8_t bits;
-    uint8_t mask;
-
-    code = (unsigned char)ch;
-    if (code > 127u)
-        code = (unsigned char)'?';
-    glyph = &ascii_font_5x7[(unsigned)code * 5u];
-
-    for (row = 0; row < 8; row++)
-    {
-        mask = (uint8_t)(1u << row);
-        for (col = 0; col < 5; col++)
-        {
-            bits = glyph[col];
-            if (bits & mask)
-                raw_set_pixel(px + col, py + row, 1u);
-        }
-    }
-}
-*/
-
 static void draw_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color)
 {
     unsigned char code;
@@ -526,6 +498,8 @@ static void draw_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg
     uint8_t mask;
 
     code = (unsigned char)ch;
+    for (col = 0; col < 6; col++)
+        raw_set_pixel(px + col, py-1, bg_color);
     for (row = 0; row < 8; row++)
     {
         mask = (uint8_t)(1u << row);
@@ -534,11 +508,12 @@ static void draw_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg
             RIA.step0 = 0;
             RIA.addr0 = XRAM_FONT5x7_ADDR + (unsigned)code * XRAM_FONT5x7_GLYPH_SIZE + (unsigned)col;
             bits = RIA.rw0;
-            // RIA.addr0 = CANVAS_DATA + ((py + row) * CANVAS_STRIDE) + (px + col);
-            // RIA.rw0 = (bits & mask) ? fg_color : bg_color;
-            if (bits & mask) raw_set_pixel(px + col, py + row, fg_color);
+            raw_set_pixel(px + col, py + row, (bits & mask) ? fg_color : bg_color);
         }
+        raw_set_pixel(px + 5, py + row, bg_color);
     }
+    for (col = 0; col < 6; col++)
+        raw_set_pixel(px + col, py + 8, bg_color);
 }
 
 static void draw_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color)
@@ -564,63 +539,6 @@ static int text_width(const char *text)
     if (width != 0)
         width--;
     return width;
-}
-
-static void fill_rect_pixels(int x1, int y1, int x2, int y2, uint8_t color)
-{
-    int x;
-    int y;
-
-    if (x1 < 0)
-        x1 = 0;
-    if (y1 < 0)
-        y1 = 0;
-    if (x2 >= (int)GFX_CANVAS_WIDTH)
-        x2 = (int)GFX_CANVAS_WIDTH - 1;
-    if (y2 >= (int)GFX_CANVAS_HEIGHT)
-        y2 = (int)GFX_CANVAS_HEIGHT - 1;
-    if (x1 > x2 || y1 > y2)
-        return;
-
-    for (y = y1; y <= y2; y++)
-    {
-        for (x = x1; x <= x2; x++)
-            raw_set_pixel(x, y, color);
-    }
-}
-
-static void draw_text_inverted(const char *text, int px, int py, int max_x)
-{
-    int width;
-    int x;
-    unsigned char code;
-    int row;
-    int col;
-    uint8_t bits;
-    uint8_t mask;
-
-    width = text_width(text);
-    fill_rect_pixels(px - 1, py - 1, px + width, py + 8, WHITE);
-
-    x = px;
-    while (*text != '\0' && (x + 4) <= max_x)
-    {
-        code = (unsigned char)*text;
-        for (row = 0; row < 8; row++)
-        {
-            mask = (uint8_t)(1u << row);
-            for (col = 0; col < 5; col++)
-            {
-                RIA.step0 = 0;
-                RIA.addr0 = XRAM_FONT5x7_ADDR + (unsigned)code * XRAM_FONT5x7_GLYPH_SIZE + (unsigned)col;
-                bits = RIA.rw0;
-                if (bits & mask)
-                    raw_set_pixel(x + col, py + row, BLACK);
-            }
-        }
-        x += 6;
-        text++;
-    }
 }
 
 static void draw_header_bar(void)
@@ -651,13 +569,13 @@ static void draw_header_bar(void)
 
     py = (int)((STARTUP_TOP_MARGIN - 8u) / 2u);
 
-    draw_text_inverted(loader_name, 0, py, (int)GFX_CANVAS_WIDTH - 1);
+    draw_text(loader_name, 0, py, (int)GFX_CANVAS_WIDTH - 1, BLACK, WHITE);
 
-    sprintf(total_text, "total images : %u", startup_bmp_count);
+    sprintf(total_text, " total images : %u ", startup_bmp_count);
     total_x = ((int)GFX_CANVAS_WIDTH - text_width(total_text)) / 2;
     if (total_x < 0)
         total_x = 0;
-    draw_text(total_text, total_x, py, (int)GFX_CANVAS_WIDTH - 1, BLACK, WHITE);
+    draw_text(total_text, total_x, py, (int)GFX_CANVAS_WIDTH - 1, WHITE, BLACK);
 
     page_text[0] = '\0';
     keys_text[0] = '\0';
@@ -691,58 +609,8 @@ static void draw_header_bar(void)
         draw_text("use", keys_x, py, page_x - 1, WHITE, BLACK);
         draw_text(keys_text, keys_x + text_width("use "), py, page_x - 1, WHITE, BLACK);
     }
-    draw_text_inverted(page_text, page_x + 5, py, (int)GFX_CANVAS_WIDTH - 6);
+    draw_text(page_text, page_x + 5, py, (int)GFX_CANVAS_WIDTH - 1, BLACK, WHITE);
 }
-
-/* do not touch this
-static void draw_tile(unsigned index)
-{
-    int tile_x;
-    int tile_y;
-    int x2;
-    int y2;
-    int label_y;
-    int label_w;
-    const char *label;
-
-    tile_x = (int)((index % STARTUP_TILE_COLS) * STARTUP_TILE_WIDTH);
-    tile_y = (int)((index / STARTUP_TILE_COLS) * STARTUP_TILE_HEIGHT);
-    x2 = tile_x + (int)STARTUP_TILE_WIDTH - 1;
-    y2 = tile_y + (int)STARTUP_TILE_HEIGHT - 1;
-
-    // fill_canvas(0u);
-    // fill_canvas(1u);
-    (void)x2;
-    (void)y2;
-
-    RIA.step0 = 0;
-    label = (index < startup_bmp_count) ? startup_basename(startup_bmp_names[index]) : "";
-
-    for (x2 = tile_x; x2 < tile_x + (int)STARTUP_TILE_WIDTH; x2++)
-    {
-        raw_set_pixel(x2, tile_y, 0u);
-        raw_set_pixel(x2, y2, 0u);
-    }
-    for (y2 = tile_y; y2 < tile_y + (int)STARTUP_TILE_HEIGHT; y2++)
-    {
-        raw_set_pixel(tile_x, y2, 0u);
-        raw_set_pixel(tile_x + (int)STARTUP_TILE_WIDTH - 1, y2, 0u);
-    }
-
-    label_w = 4 + (int)(strlen(label) * 6u);
-    if (label_w > (int)STARTUP_TILE_WIDTH)
-        label_w = (int)STARTUP_TILE_WIDTH;
-    label_y = tile_y + (int)STARTUP_TILE_HEIGHT - (int)STARTUP_LABEL_HEIGHT;
-
-    for (y2 = label_y; y2 < tile_y + (int)STARTUP_TILE_HEIGHT; y2++)
-    {
-        for (x2 = tile_x; x2 < tile_x + label_w; x2++)
-            raw_set_pixel(x2, y2, 0u);
-    }
-
-    draw_text(label, tile_x + 2, label_y + 1, tile_x + label_w - 3);
-}
-*/
 
 static void draw_tiles(void)
 {
@@ -992,6 +860,12 @@ int main(int argc, char *argv[])
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     xreg_ria_keyboard(KEYBOARD_INPUT);
     PAUSE(PAUSE_TICKS_START);
+    xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, POINTER_STRUCT, GFX_PLANE_2);
+    mouse_pos_x = (int16_t)(GFX_CANVAS_WIDTH / 2u);
+    mouse_pos_y = (int16_t)(GFX_CANVAS_HEIGHT / 2u);
+    xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, x_pos_px, mouse_pos_x);
+    xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, y_pos_px, mouse_pos_y);
+    draw_pointer(POINTER_hourglass);
     clear_canvas_random_blocks8();
     startup_collect_bmps();
     if (startup_bmp_count == 0u)
@@ -1001,12 +875,7 @@ int main(int argc, char *argv[])
     } else {
         startup_clear_page_cache();
         draw_tiles();
-        xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, POINTER_STRUCT, GFX_PLANE_2);
-        mouse_pos_x = (int16_t)(GFX_CANVAS_WIDTH / 2u);
-        mouse_pos_y = (int16_t)(GFX_CANVAS_HEIGHT / 2u);
-        xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, x_pos_px, mouse_pos_x - 7);
-        xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, y_pos_px, mouse_pos_y - 7);
-        draw_pointer(0u);
+        draw_pointer(POINTER_arrow);
         mouse_init();
         selected = wait_for_selection();
         if (selected >= 0 && (unsigned)selected < startup_bmp_count){

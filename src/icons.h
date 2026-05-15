@@ -17,16 +17,19 @@
 #define XRAM_POINTERS_cross          (XRAM_POINTERS_ADDR + POINTER_cross * XRAM_POINTERS_SIZE)
 #define XRAM_POINTERS_hourglass      (XRAM_POINTERS_ADDR + POINTER_hourglass * XRAM_POINTERS_SIZE)
 
+#ifdef TOOLBAR_ICONS
 #define XRAM_TOOLBAR_ICONS_ADDR      XRAM_POINTERS_ADDR_END
 #define XRAM_TOOLBAR_ICONS_COUNT     15u
 #define XRAM_TOOLBAR_ICONS_SIZE      (2u * 16u)
 #define XRAM_TOOLBAR_ICONS_ADDR_END  (XRAM_TOOLBAR_ICONS_ADDR + XRAM_TOOLBAR_ICONS_COUNT * XRAM_TOOLBAR_ICONS_SIZE)
+#endif
 
+#ifdef TOOLBAR_SHAPES
 #define XRAM_TOOLBAR_SHAPES_ADDR     XRAM_TOOLBAR_ICONS_ADDR_END
 #define XRAM_TOOLBAR_SHAPES_COUNT    6u
 #define XRAM_TOOLBAR_SHAPES_SIZE     8u
 #define XRAM_TOOLBAR_SHAPES_ADDR_END (XRAM_TOOLBAR_SHAPES_ADDR + XRAM_TOOLBAR_SHAPES_COUNT * XRAM_TOOLBAR_SHAPES_SIZE)
-
+#endif
 
 #ifndef XRAM_POINTERS
 // bitmap size 16x16
@@ -128,6 +131,8 @@ static const uint8_t hourglass[225] = {
       0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0
 };
 #endif
+
+#ifdef TOOLBAR_ICONS
 
 #define SHAPE_COUNT  6
 #define SHAPE_SQUARE 0
@@ -535,3 +540,4 @@ static const uint16_t mirrorH_tool_selected_icon[16] = {
     0b0010101010101010,
     0b0000000000000000
 };
+#endif

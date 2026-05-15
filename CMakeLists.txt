@@ -13,6 +13,7 @@ target_sources(paintHD PRIVATE
     src/paintHD.c
     src/bmp.c
 )
+target_link_options(paintHD PRIVATE "-Wl" "-D__STACKSIZE__=0x0200") # default 0x0800 wastes RAM; 0x0200 verified sufficient
 
 add_executable(paintHDloader)
 rp6502_asset(paintHDloader 0x10000 assets/paintHDtools.bin)

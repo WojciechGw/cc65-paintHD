@@ -29,6 +29,8 @@
 #include "font5x7.h"
 #undef font
 
+#define TOOLBAR_ICONS
+#define TOOLBAR_SHAPES
 #include "icons.h"
 
 #define PATHS_APP "./"
