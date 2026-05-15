@@ -16,10 +16,12 @@
 #ifndef FONT5X7_H
 #define FONT5X7_H
 
-// #define XRAM_FONT5x7
+#define XRAM_FONT5x7
 #ifdef XRAM_FONT5x7
-	#define XRAM_FONT5x7_ADDR 0xEC00
-	#define XRAM_FONT5x7_GLYPHSIZE 5
+	#define XRAM_FONT5x7_ADDR XRAM_GFXASSETS_ADDR
+	#define XRAM_FONT5x7_GLYPH_SIZE 5u
+	#define XRAM_FONT5x7_GLYPH_COUNT 255u
+	#define XRAM_FONT5x7_ADDR_END (XRAM_FONT5x7_ADDR + XRAM_FONT5x7_GLYPH_COUNT * XRAM_FONT5x7_GLYPH_SIZE)
 #else
 // Standard ASCII 5x7 font
 static const unsigned char font[] = {

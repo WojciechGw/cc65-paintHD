@@ -1,5 +1,32 @@
 #include <stdint.h>
 
+#define XRAM_POINTERS
+#define XRAM_TOOLBAR_ICONS
+#define XRAM_TOOLBAR_SHAPES
+
+#define XRAM_POINTERS_SIZE           (15u * 15u)
+#define XRAM_POINTERS_COUNT          3u
+#define XRAM_POINTERS_ADDR           XRAM_FONT5x7_ADDR_END
+#define XRAM_POINTERS_arrow          XRAM_POINTERS_ADDR
+#define XRAM_POINTERS_cross          (XRAM_POINTERS_arrow + XRAM_POINTERS_SIZE)
+#define XRAM_POINTERS_hourglass      (XRAM_POINTERS_cross + XRAM_POINTERS_SIZE)
+#define XRAM_POINTERS_ADDR_END       (XRAM_POINTERS_ADDR + XRAM_POINTERS_SIZE * XRAM_POINTERS_COUNT)
+
+#define XRAM_TOOLBAR_ICONS_ADDR      XRAM_POINTERS_ADDR_END
+#define XRAM_TOOLBAR_ICONS_COUNT     15u
+#define XRAM_TOOLBAR_ICONS_SIZE      (2u * 16u)
+#define XRAM_TOOLBAR_ICONS_ADDR_END  (XRAM_TOOLBAR_ICONS_ADDR + XRAM_TOOLBAR_ICONS_COUNT * XRAM_TOOLBAR_ICONS_SIZE)
+
+#define XRAM_TOOLBAR_SHAPES_ADDR     XRAM_TOOLBAR_ICONS_ADDR_END
+#define XRAM_TOOLBAR_SHAPES_COUNT    6u
+#define XRAM_TOOLBAR_SHAPES_SIZE     8u
+#define XRAM_TOOLBAR_SHAPES_ADDR_END (XRAM_TOOLBAR_SHAPES_ADDR + XRAM_TOOLBAR_SHAPES_COUNT * XRAM_TOOLBAR_SHAPES_SIZE)
+
+#define POINTER_arrow 0u
+#define POINTER_cross 1u
+#define POINTER_hourglass 2u
+
+#ifndef XRAM_POINTERS
 // bitmap size 16x16
 /*
 static const uint8_t arrow[225] = {
@@ -40,7 +67,6 @@ static const uint8_t arrow[225] = {
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 70,  0,  0
 };
 
-#ifdef ICONS_FULLSET
 // cross - 8bpp green center: (-7,-7)
 static const uint8_t cross[225] = {
       0,  0,  0,  0,  0,  0,  0, 10,  0,  0,  0,  0,  0,  0,  0,
@@ -79,6 +105,126 @@ static const uint8_t cross[225] = {
       0,  0,  0,  0,  0,  0, 10, 10, 10,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0, 10,  0,  0,  0,  0,  0,  0,  0,
 };
+*/
+
+// hourglass - 8bpp, center: (-7,-7)
+static const uint8_t hourglass[225] = {
+      0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,
+      0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,
+      0,  0,  1,  0,  1,  1,  0,  0,  0,  1,  1,  0,  1,  0,  0,
+      0,  0,  0,  1,  0,  1,  1,  1,  1,  1,  0,  1,  0,  0,  0,
+      0,  0,  0,  0,  1,  0,  1,  1,  1,  0,  1,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  1,  0,  1,  0,  1,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  1,  1,  1,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  1,  0,  1,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  1,  0,  1,  0,  1,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,
+      0,  0,  0,  1,  0,  0,  0,  1,  0,  0,  0,  1,  0,  0,  0,
+      0,  0,  1,  0,  0,  1,  1,  1,  1,  1,  0,  0,  1,  0,  0,
+      0,  0,  1,  0,  1,  1,  1,  1,  1,  1,  1,  0,  1,  0,  0,
+      0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0
+};
+#endif
+
+#define SHAPE_COUNT  6
+#define SHAPE_SQUARE 0
+#define SHAPE_CIRCLE 1
+#define SHAPE_VERT   2
+#define SHAPE_DIAG   3
+#define SHAPE_SPRAY  4
+#define SHAPE_FILL   5
+
+// 8x8 bitmaps, MSB = leftmost pixel
+static const uint8_t icons[SHAPE_COUNT][8] = {
+    { 0b00000000,  // square
+        0b01111110,
+        0b01111110,
+        0b01111110,
+        0b01111110,
+        0b01111110,
+        0b01111110,
+        0b00000000 },
+    { 0b00000000,  // circle
+        0b00111100,
+        0b01111110,
+        0b01111110,
+        0b01111110,
+        0b01111110,
+        0b00111100,
+        0b00000000 },
+    { 0b00011000,  // vertical
+        0b00011000,
+        0b00011000,
+        0b00011000,
+        0b00011000,
+        0b00011000,
+        0b00011000,
+        0b00011000 },
+    { 0b10000000,  // diagonal
+        0b11000000,
+        0b01100000,
+        0b00110000,
+        0b00011000,
+        0b00001100,
+        0b00000110,
+        0b00000010 },
+    { 0b00101000,  // spray
+        0b00000000,
+        0b01010100,
+        0b00000000,
+        0b10101010,
+        0b00000000,
+        0b01010100,
+        0b00000000 },
+    { 0b00111111, // fill (bucket)
+        0b01111111,
+        0b10111111,
+        0b10000000,
+        0b11111100,
+        0b00001100,
+        0b00001100,
+        0b00001100 },
+};
+
+/*
+#define ICONS_erase_icon_black_ADDR                   1950     32  uint16  16
+#define ICONS_erase_icon_white_ADDR                   1982     32  uint16  16
+#define ICONS_erase_icon_black_selected_ADDR          2014     32  uint16  16
+#define ICONS_erase_icon_white_selected_ADDR          2046     32  uint16  16
+#define ICONS_swap_icon_ADDR                          2078     32  uint16  16
+#define ICONS_save_icon_ADDR                          2110     32  uint16  16
+#define ICONS_invert_icon_ADDR                        2142     32  uint16  16
+#define ICONS_invert_selected_icon_ADDR               2174     32  uint16  16
+#define ICONS_select_icon_ADDR                        2206     32  uint16  16
+#define ICONS_rect_tool_icon_ADDR                     2238     32  uint16  16
+#define ICONS_ellipse_tool_icon_ADDR                  2270     32  uint16  16
+#define ICONS_mirrorV_tool_icon_ADDR                  2302     32  uint16  16
+#define ICONS_mirrorH_tool_icon_ADDR                  2334     32  uint16  16
+#define ICONS_mirrorV_tool_selected_icon_ADDR         2366     32  uint16  16
+#define ICONS_mirrorH_tool_selected_icon_ADDR         2398     32  uint16  16
+
+#define ICONS_cross_SIZE                              225  uint8   225
+#define ICONS_hourglass_SIZE                          225  uint8   225
+#define ICONS_erase_icon_black_SIZE                   32  uint16  16
+#define ICONS_erase_icon_white_SIZE                   32  uint16  16
+#define ICONS_erase_icon_black_selected_SIZE          32  uint16  16
+#define ICONS_erase_icon_white_selected_SIZE          32  uint16  16
+#define ICONS_swap_icon_SIZE                          32  uint16  16
+#define ICONS_save_icon_SIZE                          32  uint16  16
+#define ICONS_invert_icon_SIZE                        32  uint16  16
+#define ICONS_invert_selected_icon_SIZE               32  uint16  16
+#define ICONS_select_icon_SIZE                        32  uint16  16
+#define ICONS_rect_tool_icon_SIZE                     32  uint16  16
+#define ICONS_ellipse_tool_icon_SIZE                  32  uint16  16
+#define ICONS_mirrorV_tool_icon_SIZE                  32  uint16  16
+#define ICONS_mirrorH_tool_icon_SIZE                  32  uint16  16
+#define ICONS_mirrorV_tool_selected_icon_SIZE         32  uint16  16
+#define ICONS_mirrorH_tool_selected_icon_SIZE         32  uint16  16
+
+#define ICONS_icons_ADDR                              2430
+#define ICONS_icons_SIZE                              8
+#define ICONS_icons_COUNT                             6
 */
 
 // toolbar 16x16 1bpp
@@ -387,84 +533,3 @@ static const uint16_t mirrorH_tool_selected_icon[16] = {
     0b0010101010101010,
     0b0000000000000000
 };
-
-// hourglass - 8bpp, center: (-7,-7)
-static const uint8_t hourglass[225] = {
-      0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,
-      0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,
-      0,  0,  1,  0,  1,  1,  0,  0,  0,  1,  1,  0,  1,  0,  0,
-      0,  0,  0,  1,  0,  1,  1,  1,  1,  1,  0,  1,  0,  0,  0,
-      0,  0,  0,  0,  1,  0,  1,  1,  1,  0,  1,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  1,  0,  1,  0,  1,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  1,  1,  1,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  1,  0,  1,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  1,  0,  1,  0,  1,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,
-      0,  0,  0,  1,  0,  0,  0,  1,  0,  0,  0,  1,  0,  0,  0,
-      0,  0,  1,  0,  0,  1,  1,  1,  1,  1,  0,  0,  1,  0,  0,
-      0,  0,  1,  0,  1,  1,  1,  1,  1,  1,  1,  0,  1,  0,  0,
-      0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0
-};
-
-#define SHAPE_COUNT  6
-#define SHAPE_SQUARE 0
-#define SHAPE_CIRCLE 1
-#define SHAPE_VERT   2
-#define SHAPE_DIAG   3
-#define SHAPE_SPRAY  4
-#define SHAPE_FILL   5
-
-// 8x8 bitmaps, MSB = leftmost pixel
-static const uint8_t icons[SHAPE_COUNT][8] = {
-    { 0b00000000,  // square
-        0b01111110,
-        0b01111110,
-        0b01111110,
-        0b01111110,
-        0b01111110,
-        0b01111110,
-        0b00000000 },
-    { 0b00000000,  // circle
-        0b00111100,
-        0b01111110,
-        0b01111110,
-        0b01111110,
-        0b01111110,
-        0b00111100,
-        0b00000000 },
-    { 0b00011000,  // vertical
-        0b00011000,
-        0b00011000,
-        0b00011000,
-        0b00011000,
-        0b00011000,
-        0b00011000,
-        0b00011000 },
-    { 0b10000000,  // diagonal
-        0b11000000,
-        0b01100000,
-        0b00110000,
-        0b00011000,
-        0b00001100,
-        0b00000110,
-        0b00000010 },
-    { 0b00101000,  // spray
-        0b00000000,
-        0b01010100,
-        0b00000000,
-        0b10101010,
-        0b00000000,
-        0b01010100,
-        0b00000000 },
-    { 0b00111111, // fill (bucket)
-        0b01111111,
-        0b10111111,
-        0b10000000,
-        0b11111100,
-        0b00001100,
-        0b00001100,
-        0b00001100 },
-};
-
-#endif

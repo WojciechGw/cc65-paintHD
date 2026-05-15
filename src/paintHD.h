@@ -23,6 +23,8 @@
 #include <unistd.h>
 #include "bmp.h"
 
+#define XRAM_GFXASSETS_ADDR 0xEC00u
+
 #define font ascii_font_5x7
 #include "font5x7.h"
 #undef font

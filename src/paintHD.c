@@ -186,7 +186,7 @@ static void busy_begin(void)
     picker_status[sizeof(picker_status) - 1u] = '\0';
     picker_status_deadline = 0;
     draw_picker_status();
-    draw_pointer(2);
+    draw_pointer(POINTER_hourglass);
 }
 
 static void busy_end(void)
@@ -2615,6 +2615,7 @@ static char *append_coord_value(char *out, int value)
     return out;
 }
 
+#ifndef XRAM_FONT5x7
 static void draw_picker_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color)
 {
     const uint8_t *glyph;
@@ -2641,6 +2642,31 @@ static void draw_picker_text_char(char ch, int px, int py, uint8_t fg_color, uin
         }
     }
 }
+#else
+static void draw_picker_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color)
+{
+    unsigned char code;
+    int row, col;
+    uint8_t bits;
+    uint8_t mask;
+
+    code = (unsigned char)ch;
+    if (code > 127u)
+        code = (unsigned char)'?';
+    for (row = 0; row < 8; row++)
+    {
+        for (col = 0; col < 5; col++)
+        {
+            RIA.step0 = 0;
+            RIA.addr0 = XRAM_FONT5x7_ADDR + (unsigned)code * XRAM_FONT5x7_GLYPH_SIZE + (unsigned)col;
+            bits = RIA.rw0;
+            mask = (uint8_t)(1u << row);
+            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (py + row) + (px + col);
+            RIA.rw0 = (bits & mask) ? fg_color : bg_color;
+        }
+    }
+}
+#endif
 
 static void draw_picker_text_colors(const char *text, int px, int py, uint8_t fg_color, uint8_t bg_color)
 {
@@ -2867,34 +2893,6 @@ static void draw_swap_button(void)
         }
     }
 }
-
-/* can't touch this 
-static void archive_draw_swap_button(void)
-{
-    int x, y;
-    int row, col;
-    uint8_t color;
-    uint8_t upper_color;
-    uint8_t lower_color;
-
-    y = 6;
-    x = PICKER_SWAP_X + 4;
-    upper_color = left_color ? PICKER_FG_COLOR : PICKER_PANEL_COLOR;
-    lower_color = right_color ? PICKER_FG_COLOR : PICKER_PANEL_COLOR;
-
-    draw_picker_box(PICKER_PANEL_COLOR, PICKER_SWAP_X, 2, PICKER_SWAP_X + PICKER_BUTTON_SIZE - 1, 17);
-    for (row = 0; row < 8; row++)
-    {
-        for (col = 0; col < 8; col++)
-        {
-            color = (col <= row) ? lower_color : upper_color;
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
-            RIA.rw0 = color;
-        }
-    }
-}
-*/
 
 static void draw_erase_button(void)
 {
@@ -4397,6 +4395,8 @@ static void move(int x, int y)
     }
 }
 
+#ifndef XRAM_POINTERS
+
 static void draw_pointer(uint8_t type)
 {
     // clang-format on
@@ -4414,6 +4414,24 @@ static void draw_pointer(uint8_t type)
         for (i = 0; i < sizeof(hourglass); i++) RIA.rw0 = hourglass[i];
     }
 }
+
+#else
+
+static void draw_pointer(uint8_t type)
+{
+    switch(type){
+    case 0:
+        xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, xram_data_ptr, XRAM_POINTERS_arrow);
+        break;
+    case 1:
+        xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, xram_data_ptr, XRAM_POINTERS_cross);
+        break;
+    case 2:
+        xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, xram_data_ptr, XRAM_POINTERS_hourglass);
+    }
+}
+
+#endif
 
 static void mouse(void)
 {
@@ -4670,7 +4688,7 @@ int main(int argc, char *argv[]){
     snapshot_refresh_current();
     draw_picker();
     move_picker(((GFX_CANVAS_WIDTH - (PICKER_WIDTH))/2), GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
-    draw_pointer(0);
+    draw_pointer(POINTER_arrow);
 
     busy_begin();
     LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
