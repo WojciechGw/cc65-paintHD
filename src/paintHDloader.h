@@ -19,11 +19,17 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include "icons.h"
+
+#define XRAM_GFXASSETS_ADDR 0xEC00u
 
 #define font ascii_font_5x7
 #include "font5x7.h"
 #undef font
+
+#include "icons.h"
+
+#define BLACK 0
+#define WHITE 1
 
 #define CANVAS_DATA          0x0000
 #define POINTER_DATA         0xEA00
@@ -94,8 +100,8 @@ static void startup_page_cache_path(unsigned page, char *out);
 static void startup_clear_page_cache(void);
 static uint8_t startup_load_page_cache(unsigned page);
 static void startup_save_page_cache(unsigned page);
-static void draw_text_char(char ch, int px, int py);
-static void draw_text(const char *text, int px, int py, int max_x);
+static void draw_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color);
+static void draw_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color);
 static int text_width(const char *text);
 static void fill_rect_pixels(int x1, int y1, int x2, int y2, uint8_t color);
 static void draw_text_inverted(const char *text, int px, int py, int max_x);

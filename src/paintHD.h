@@ -29,7 +29,6 @@
 #include "font5x7.h"
 #undef font
 
-#define ICONS_FULLSET
 #include "icons.h"
 
 #define PATHS_APP "./"

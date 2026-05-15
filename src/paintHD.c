@@ -2626,8 +2626,6 @@ static void draw_picker_text_char(char ch, int px, int py, uint8_t fg_color, uin
     uint8_t c;
 
     code = (unsigned char)ch;
-    if (code > 127u)
-        code = (unsigned char)'?';
     glyph = &ascii_font_5x7[(unsigned)code * 5u];
     for (row = 0; row < 8; row++)
     {
@@ -2651,8 +2649,6 @@ static void draw_picker_text_char(char ch, int px, int py, uint8_t fg_color, uin
     uint8_t mask;
 
     code = (unsigned char)ch;
-    if (code > 127u)
-        code = (unsigned char)'?';
     for (row = 0; row < 8; row++)
     {
         for (col = 0; col < 5; col++)
