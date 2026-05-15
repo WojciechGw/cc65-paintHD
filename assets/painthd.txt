@@ -27,8 +27,14 @@ Mouse and keyboard
 - LMB paints with the color assigned to the left button.
 - RMB paints with the color assigned to the right button.
 - Mouse wheel adjusts the brush size, even mid-stroke.
-- Ctrl + LMB starts and continues straight line drawing.
-- Ctrl + Shift + LMB constrains line drawing to horizontal or vertical segments.
+- MMB toggles a full-screen crosshair overlay centered on the cursor position.
+- Ctrl sets the status bar to "set start point" while held.
+- Ctrl + LMB sets the start point of a straight line; an X marker appears at that position and the status bar changes to "set end point".
+- Ctrl + LMB at the end point draws a line with the left-button color.
+- Ctrl + RMB at the end point draws a line with the right-button color.
+- After drawing, the end point automatically becomes the new start point, enabling continuous polyline drawing while Ctrl is held.
+- Releasing Ctrl cancels the current line session and removes the X marker.
+- Ctrl + Shift + LMB or Ctrl + Shift + RMB constrains the line to horizontal or vertical segments.
 - Ctrl + A clears the current selection and returns to normal painting.
 - Ctrl + C copies the current selection to the clipboard file.
 - Ctrl + Q saves the image to "paintHD_save.bmp" and exit.
