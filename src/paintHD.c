@@ -67,6 +67,7 @@ static uint8_t circle_cached_size;
 static uint8_t circle_row_left[BRUSH_MAX];
 static uint8_t circle_row_right[BRUSH_MAX];
 static int picker_x, picker_y;
+static int zoom_saved_picker_x, zoom_saved_picker_y;
 static int drag_x, drag_y;
 static int line_anchor_x, line_anchor_y;
 static int line_x, line_y;
@@ -1730,6 +1731,34 @@ static void zoom_area_show(void)
     zoom_area_visible = true;
 }
 
+static void zoom_redraw_icons(void)
+{
+    draw_swap_button();
+    draw_erase_button();
+    draw_invert_button();
+    draw_mirror_button();
+    draw_select_button();
+    draw_rect_tool_button();
+    draw_ellipse_tool_button();
+    draw_all_shape_buttons();
+}
+
+static void zoom_enter_view(void)
+{
+    zoom_saved_picker_x = picker_x;
+    zoom_saved_picker_y = picker_y;
+    move_picker(0, (int)GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
+    zoom_view_active = true;
+    zoom_redraw_icons();
+}
+
+static void zoom_exit_view(void)
+{
+    zoom_view_active = false;
+    move_picker(zoom_saved_picker_x, zoom_saved_picker_y);
+    zoom_redraw_icons();
+}
+
 static void zoom_cancel(void)
 {
     if (zoom_area_active)
@@ -1743,7 +1772,7 @@ static void zoom_cancel(void)
         busy_begin();
         snapshot_load_canvas("TMP/paintHD_zoom.bin");
         busy_end();
-        zoom_view_active = false;
+        zoom_exit_view();
         set_picker_status("");
     }
 }
@@ -1802,7 +1831,7 @@ static void zoom_apply_changes(void)
             v = RIA.rw1;
             raw_set_pixel(zoom_area_x + sx, zoom_area_y + sy, v ? 1 : 0);
         }
-    zoom_view_active = false;
+    zoom_exit_view();
     set_picker_status("");
 }
 
@@ -3015,12 +3044,35 @@ static void draw_mouse_coords(int x, int y)
     int py;
 
     out = text;
-    *out++ = '(';
-    out = append_coord_value(out, x);
-    *out++ = ',';
-    out = append_coord_value(out, y);
-    *out++ = ')';
-    *out = '\0';
+    if (zoom_view_active)
+    {
+        int bx = x - (int)ZOOM_VIEW_X0;
+        int by = y - (int)ZOOM_VIEW_Y0;
+        int sx = (bx >= 0 && bx < (int)ZOOM_VIEW_W) ? bx / ZOOM_DOT : -1;
+        int sy = (by >= 0 && by < (int)ZOOM_VIEW_H) ? by / ZOOM_DOT : -1;
+        *out++ = '[';
+        if (sx >= 0 && sy >= 0)
+        {
+            out = append_coord_value(out, sx);
+            *out++ = ',';
+            out = append_coord_value(out, sy);
+        }
+        else
+        {
+            *out++ = '-';
+        }
+        *out++ = ']';
+        *out = '\0';
+    }
+    else
+    {
+        *out++ = '(';
+        out = append_coord_value(out, x);
+        *out++ = ',';
+        out = append_coord_value(out, y);
+        *out++ = ')';
+        *out = '\0';
+    }
 
     draw_picker_box(PICKER_PANEL_COLOR, PICKER_COORDS_X, 1,
                     PICKER_COORDS_X + PICKER_COORDS_WIDTH - 1, 18);
@@ -3171,6 +3223,11 @@ static void draw_size_display(void)
     draw_picker_text(text, px, py, PICKER_PANEL_COLOR);
 }
 
+static uint8_t ui_icon_color(void)
+{
+    return zoom_view_active ? PICKER_SAVE_DISABLED_COLOR : PICKER_FG_COLOR;
+}
+
 static void draw_swap_button(void)
 {
     int x, y;
@@ -3194,7 +3251,7 @@ static void draw_swap_button(void)
                 mask = (uint16_t)(1u << col);
             else
                 mask = (uint16_t)(0x8000u >> col);
-            color = (bits & mask) ? PICKER_FG_COLOR : PICKER_PANEL_COLOR;
+            color = (bits & mask) ? ui_icon_color() : PICKER_PANEL_COLOR;
             RIA.step0 = 0;
             RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
             RIA.rw0 = color;
@@ -3223,7 +3280,7 @@ static void draw_erase_button(void)
         bits = icon[row];
         for (col = 0; col < 16; col++)
         {
-            color = (bits & (uint16_t)(0x8000u >> col)) ? PICKER_FG_COLOR : PICKER_PANEL_COLOR;
+            color = (bits & (uint16_t)(0x8000u >> col)) ? ui_icon_color() : PICKER_PANEL_COLOR;
             RIA.step0 = 0;
             RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
             RIA.rw0 = color;
@@ -3272,7 +3329,7 @@ static void draw_invert_button(void)
         bits = icon[row];
         for (col = 0; col < 16; col++)
         {
-            color = (bits & (uint16_t)(0x8000u >> col)) ? PICKER_FG_COLOR : PICKER_PANEL_COLOR;
+            color = (bits & (uint16_t)(0x8000u >> col)) ? ui_icon_color() : PICKER_PANEL_COLOR;
             RIA.step0 = 0;
             RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (2 + row) + (PICKER_INVERT_X + col);
             RIA.rw0 = color;
@@ -3299,7 +3356,7 @@ static void draw_mirror_button(void)
         bits = icon[row];
         for (col = 0; col < 16; col++)
         {
-            color = (bits & (uint16_t)(0x8000u >> col)) ? PICKER_FG_COLOR : PICKER_PANEL_COLOR;
+            color = (bits & (uint16_t)(0x8000u >> col)) ? ui_icon_color() : PICKER_PANEL_COLOR;
             RIA.step0 = 0;
             RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (2 + row) + (PICKER_MIRROR_X + col);
             RIA.rw0 = color;
@@ -3763,7 +3820,7 @@ static void draw_select_button(void)
         for (col = 0; col < 16; col++)
         {
             color = (bits & (uint16_t)(0x8000u >> col))
-                        ? (active ? PICKER_PANEL_COLOR : PICKER_FG_COLOR)
+                        ? (active ? PICKER_PANEL_COLOR : ui_icon_color())
                         : (active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR);
             RIA.step0 = 0;
             RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
@@ -3790,7 +3847,7 @@ static void draw_rect_tool_button(void)
     y = 2;
     draw_picker_box(active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
                     x, 1, x + PICKER_BUTTON_SIZE - 1, 18);
-    icon_color = enabled ? PICKER_FG_COLOR : PICKER_SAVE_DISABLED_COLOR;
+    icon_color = enabled ? ui_icon_color() : PICKER_SAVE_DISABLED_COLOR;
     for (row = 0; row < 16; row++)
     {
         bits = rect_tool_icon[row];
@@ -3824,7 +3881,7 @@ static void draw_ellipse_tool_button(void)
     y = 2;
     draw_picker_box(active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
                     x, 1, x + PICKER_BUTTON_SIZE - 1, 18);
-    icon_color = enabled ? PICKER_FG_COLOR : PICKER_SAVE_DISABLED_COLOR;
+    icon_color = enabled ? ui_icon_color() : PICKER_SAVE_DISABLED_COLOR;
     for (row = 0; row < 16; row++)
     {
         bits = ellipse_tool_icon[row];
@@ -3844,7 +3901,7 @@ static void draw_shape_button(uint8_t shape)
 {
     int px = PICKER_SHAPE0_X + shape * PICKER_BUTTON_SIZE;
     uint8_t enabled = brush_shape_enabled(shape);
-    uint8_t icon_color = enabled ? PICKER_FG_COLOR : PICKER_SAVE_DISABLED_COLOR;
+    uint8_t icon_color = enabled ? ui_icon_color() : PICKER_SAVE_DISABLED_COLOR;
     uint8_t active = ((active_tool == TOOL_BRUSH ||
                        active_tool == TOOL_RECT ||
                        active_tool == TOOL_ELLIPSE) &&
@@ -4211,7 +4268,7 @@ static void left_press(int x, int y)
             snapshot_save_canvas("TMP/paintHD_zoom.bin");
             zoom_draw_view();
             busy_end();
-            zoom_view_active = true;
+            zoom_enter_view();
             picker_hover_status = 0;
             set_picker_hover_status("ZOOM");
         }
@@ -4868,9 +4925,12 @@ static void mouse(void)
     mb = rw;
     if (pressed & 1)  left_press(x, y);
     if (released & 1) left_release();
-    if (pressed & 2)  right_press(x, y);
-    if (released & 2) right_release();
-    if (pressed & 4)
+    if (!zoom_view_active)
+    {
+        if (pressed & 2)  right_press(x, y);
+        if (released & 2) right_release();
+    }
+    if (!zoom_view_active && (pressed & 4))
     {
         zoom_cancel();
         if (crosshair_active)
@@ -4889,8 +4949,11 @@ static void mouse(void)
     rw = RIA.rw0;
     if (rw != prev_wheel)
     {
-        zoom_cancel();
-        change_brush_size((int8_t)(rw - prev_wheel));
+        if (!zoom_view_active)
+        {
+            zoom_cancel();
+            change_brush_size((int8_t)(rw - prev_wheel));
+        }
         prev_wheel = rw;
     }
 
@@ -5182,7 +5245,7 @@ int main(int argc, char *argv[]){
                     busy_begin();
                     snapshot_load_canvas("TMP/paintHD_zoom.bin");
                     busy_end();
-                    zoom_view_active = false;
+                    zoom_exit_view();
                     set_picker_status("");
                 }
                 else if (paste_preview_active)
