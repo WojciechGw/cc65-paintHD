@@ -44,6 +44,7 @@ Mouse and keyboard
 - Shift + Ctrl + V starts transparent paste preview.
 - Ctrl + X copies the current selection and clears the selected area.
 - Ctrl + Y performs redo.
+- Ctrl + Shift + Alt + F draws a 16x16 glyph table of the built-in font at the current cursor position.
 - Ctrl + Z performs undo.
 - F1 shows the help screen.
 - F2 toggles undo on and off.

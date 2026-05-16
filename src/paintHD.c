@@ -2859,6 +2859,26 @@ static char *append_coord_value(char *out, int value)
     return out;
 }
 
+static void draw_font_table(int ox, int oy)
+{
+    int col, row;
+    unsigned int code;
+    int px, py;
+
+    for (row = 0; row < 16; row++)
+    {
+        for (col = 0; col < 16; col++)
+        {
+            code = (unsigned int)(row * 16 + col);
+            if (code > 254u)
+                break;
+            px = ox + col * 6;
+            py = oy + row * 10;
+            draw_canvas_text_char((char)code, px, py, 1u, 0u);
+        }
+    }
+}
+
 static void draw_canvas_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color)
 {
     unsigned char code;
@@ -5093,6 +5113,7 @@ int main(int argc, char *argv[]){
     static uint8_t prev_ctrl_z;
     static uint8_t prev_ctrl_alt_v;
     static uint8_t prev_ctrl_m;
+    static uint8_t prev_ctrl_shift_alt_t;
     static uint8_t prev_escape;
     static uint8_t prev_enter;
     static uint8_t prev_f1;
@@ -5471,6 +5492,27 @@ int main(int argc, char *argv[]){
         else
         {
             prev_ctrl_m = 0;
+        }
+        if (!canvas_input_locked() && !paste_preview_active &&
+            key_pressed(HID_LEFT_CTRL) && shift_pressed() && alt_pressed() &&
+            key_pressed(HID_F))
+        {
+            if (!prev_ctrl_shift_alt_t)
+            {
+                if (prepare_undo_step())
+                {
+                    canvas_modify_begin();
+                    set_canvas_dirty(true);
+                    draw_font_table(mouse_pos_x, mouse_pos_y);
+                    canvas_modify_end();
+                    snapshot_refresh_current();
+                }
+                prev_ctrl_shift_alt_t = 1u;
+            }
+        }
+        else
+        {
+            prev_ctrl_shift_alt_t = 0;
         }
         mouse();
     }
