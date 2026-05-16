@@ -63,6 +63,10 @@ static int zoom_area_marker_y;
 static uint8_t drawing_button;
 static uint8_t left_draw_armed;
 static uint8_t right_draw_armed;
+static uint8_t zoom_paint_armed;
+static uint8_t zoom_paint_value;
+static int zoom_paint_last_sx;
+static int zoom_paint_last_sy;
 static uint8_t circle_cached_size;
 static uint8_t circle_row_left[BRUSH_MAX];
 static uint8_t circle_row_right[BRUSH_MAX];
@@ -4287,8 +4291,14 @@ static void left_press(int x, int y)
                 int sy = by / ZOOM_DOT;
                 RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
                 RIA.step1 = 0;
-                RIA.rw1 = RIA.rw1 ? 0 : 1;
+                zoom_paint_value = RIA.rw1 ? 0 : 1;
+                RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
+                RIA.step1 = 0;
+                RIA.rw1 = zoom_paint_value;
                 zoom_redraw_block(sx, sy);
+                zoom_paint_armed = 1;
+                zoom_paint_last_sx = sx;
+                zoom_paint_last_sy = sy;
             }
         }
         return;
@@ -4580,6 +4590,7 @@ static void left_press(int x, int y)
 
 static void left_release(void)
 {
+    zoom_paint_armed = 0;
     if (selection_dragging)
         selection_finish_drag();
     if (primitive_dragging && drawing_button == DRAW_BUTTON_LEFT)
@@ -4826,6 +4837,26 @@ static void right_release(void)
 
 static void move(int x, int y)
 {
+    if (zoom_paint_armed)
+    {
+        int bx = x - (int)ZOOM_VIEW_X0;
+        int by = y - (int)ZOOM_VIEW_Y0;
+        if (bx >= 0 && bx < (int)ZOOM_VIEW_W && by >= 0 && by < (int)ZOOM_VIEW_H)
+        {
+            int sx = bx / ZOOM_DOT;
+            int sy = by / ZOOM_DOT;
+            if (sx != zoom_paint_last_sx || sy != zoom_paint_last_sy)
+            {
+                RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
+                RIA.step1 = 0;
+                RIA.rw1 = zoom_paint_value;
+                zoom_redraw_block(sx, sy);
+                zoom_paint_last_sx = sx;
+                zoom_paint_last_sy = sy;
+            }
+        }
+        return;
+    }
     if (is_dragging)
     {
         move_picker(x - drag_x, y - drag_y);
