@@ -71,7 +71,7 @@ static uint8_t circle_cached_size;
 static uint8_t circle_row_left[BRUSH_MAX];
 static uint8_t circle_row_right[BRUSH_MAX];
 static int picker_x, picker_y;
-static int zoom_saved_picker_x, zoom_saved_picker_y;
+// static int zoom_saved_picker_x, zoom_saved_picker_y;
 static int drag_x, drag_y;
 static int line_anchor_x, line_anchor_y;
 static int line_x, line_y;
@@ -214,28 +214,61 @@ static void busy_end(void)
     draw_pointer(current_cursor);
 }
 
-static void fill_canvas(uint8_t color)
+static void fill_canvas(uint8_t color, uint8_t pattern, uint8_t linestep, uint8_t overlay)
 {
-    unsigned i;
+    unsigned row;
+    unsigned col;
     unsigned addr;
+    uint8_t base_fill;
+    uint8_t set_mask;
+    uint8_t clr_mask;
     uint8_t fill;
 
-    fill = color ? 0xFF : 0x00;
-    addr = CANVAS_DATA;
-    for (i = 0; i < (CANVAS_STRIDE * GFX_CANVAS_HEIGHT) / 8u; i++, addr += 8u)
+    base_fill = color ? 0xFF : 0x00;
+    if (overlay)
     {
-        if ((i & 0x3Fu) == 0u && operation_cancel_requested())
-            break;
-        RIA.addr0 = addr;
-        RIA.step0 = 1;
-        RIA.rw0 = fill;
-        RIA.rw0 = fill;
-        RIA.rw0 = fill;
-        RIA.rw0 = fill;
-        RIA.rw0 = fill;
-        RIA.rw0 = fill;
-        RIA.rw0 = fill;
-        RIA.rw0 = fill;
+        /* set_mask: bits in pattern → forced to color; others unchanged */
+        set_mask = pattern & base_fill;
+        clr_mask = pattern & ~base_fill;
+        for (row = 0; row < GFX_CANVAS_HEIGHT; row++)
+        {
+            if ((row & 0x1Fu) == 0u && operation_cancel_requested())
+                break;
+            if (linestep > 0u && (row % linestep) == 0u)
+            {
+                addr = CANVAS_DATA + row * CANVAS_STRIDE;
+                for (col = 0; col < CANVAS_STRIDE; col++)
+                {
+                    RIA.step0 = 0;
+                    RIA.addr0 = addr + col;
+                    RIA.rw0 = (RIA.rw0 | set_mask) & ~clr_mask;
+                }
+            }
+        }
+    }
+    else
+    {
+        for (row = 0; row < GFX_CANVAS_HEIGHT; row++)
+        {
+            if ((row & 0x1Fu) == 0u && operation_cancel_requested())
+                break;
+            fill = (linestep > 0u && (row % linestep) == 0u)
+                   ? (base_fill ^ pattern) : base_fill;
+            addr = CANVAS_DATA + row * CANVAS_STRIDE;
+            RIA.step0 = 1;
+            for (col = 0; col < CANVAS_STRIDE / 8u; col++, addr += 8u)
+            {
+                RIA.addr0 = addr;
+                RIA.rw0 = fill;
+                RIA.rw0 = fill;
+                RIA.rw0 = fill;
+                RIA.rw0 = fill;
+                RIA.rw0 = fill;
+                RIA.rw0 = fill;
+                RIA.rw0 = fill;
+                RIA.rw0 = fill;
+            }
+        }
     }
 }
 
@@ -1745,13 +1778,38 @@ static void zoom_redraw_icons(void)
     draw_rect_tool_button();
     draw_ellipse_tool_button();
     draw_all_shape_buttons();
+    draw_picker_text_button("-", PICKER_MINUS_X);
+    draw_picker_text_button("+", PICKER_PLUS_X);
+}
+
+static void zoom_area_pixels_save(void)
+{
+    int sy, bx;
+    unsigned src_byte;
+    uint8_t byte_val;
+
+    RIA.step1 = 1;
+    RIA.addr1 = ZOOM_AREA_BUF_ADDR;
+    for (sy = 0; sy < ZOOM_AREA; sy++)
+    {
+        src_byte = (unsigned)zoom_area_y * CANVAS_STRIDE
+                   + (unsigned)zoom_area_x / 8u
+                   + (unsigned)sy * CANVAS_STRIDE;
+        for (bx = 0; bx < ZOOM_AREA / 8; bx++)
+        {
+            RIA.step0 = 0;
+            RIA.addr0 = src_byte + (unsigned)bx;
+            byte_val = RIA.rw0;
+            RIA.rw1 = byte_val;
+        }
+    }
 }
 
 static void zoom_enter_view(void)
 {
-    zoom_saved_picker_x = picker_x;
-    zoom_saved_picker_y = picker_y;
-    move_picker(0, (int)GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
+//    zoom_saved_picker_x = picker_x;
+//    zoom_saved_picker_y = picker_y;
+    // move_picker(0, (int)GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
     zoom_view_active = true;
     zoom_redraw_icons();
 }
@@ -1759,7 +1817,7 @@ static void zoom_enter_view(void)
 static void zoom_exit_view(void)
 {
     zoom_view_active = false;
-    move_picker(zoom_saved_picker_x, zoom_saved_picker_y);
+    // move_picker(zoom_saved_picker_x, zoom_saved_picker_y);
     zoom_redraw_icons();
 }
 
@@ -1845,12 +1903,26 @@ static void zoom_draw_view(void)
     uint8_t v, byte_val;
     unsigned row_addr;
 
-    /* read source pixels into XRAM scratch (port 1) before touching canvas */
-    RIA.addr1 = ZOOM_BUF_ADDR;
-    RIA.step1 = 1;
-    for (sy = 0; sy < ZOOM_AREA; sy++)
-        for (sx = 0; sx < ZOOM_AREA; sx++)
-            RIA.rw1 = raw_get_pixel(zoom_area_x + sx, zoom_area_y + sy);
+    /* read source pixels from XRAM backup into zoom scratch (port 1) */
+    {
+        uint8_t b;
+        int bit;
+        RIA.addr1 = ZOOM_BUF_ADDR;
+        RIA.step1 = 1;
+        for (sy = 0; sy < ZOOM_AREA; sy++)
+        {
+            for (sx = 0; sx < ZOOM_AREA; sx += 8)
+            {
+                RIA.step0 = 0;
+                RIA.addr0 = ZOOM_AREA_BUF_ADDR
+                            + (unsigned)sy * (ZOOM_AREA / 8u)
+                            + (unsigned)(sx / 8);
+                b = RIA.rw0;
+                for (bit = 7; bit >= 0; bit--)
+                    RIA.rw1 = (b >> bit) & 1u;
+            }
+        }
+    }
 
     /* clear full area + 1px border:
        ZOOM_FRAME_X0=184=23*8 byte-aligned, ZOOM_FRAME_W=272=34*8
@@ -1907,9 +1979,9 @@ static void zoom_draw_view(void)
         }
     }
     draw_canvas_text(" ZOOM ",
-                     ZOOM_FRAME_X0, (ZOOM_FRAME_Y0 - 2u), (GFX_CANVAS_WIDTH - 1), 0u, 1u);
-    draw_canvas_text(" [LMB] toggle pixel [ENTER] confirm [ESC] abandon ",
-                     ZOOM_FRAME_X0, (ZOOM_FRAME_Y0 + ZOOM_FRAME_H - 4), (GFX_CANVAS_WIDTH - 1), 0u, 1u);
+                     ZOOM_FRAME_X0, (ZOOM_FRAME_Y0 - 2u), (GFX_CANVAS_WIDTH - 1), BLACK, WHITE);
+    draw_canvas_text("LMB toggle ENTER confirm ESC abandon",
+                     ZOOM_FRAME_X0 + 8, (ZOOM_FRAME_Y0 + ZOOM_FRAME_H - 4), (GFX_CANVAS_WIDTH - 1), WHITE, BLACK);
 
 }
 
@@ -2915,6 +2987,7 @@ static void draw_canvas_text(const char *text, int px, int py, int max_x, uint8_
     }
 }
 
+/* unused but do not touch
 static int text_width(const char *text)
 {
     int width;
@@ -2928,55 +3001,6 @@ static int text_width(const char *text)
     if (width != 0)
         width--;
     return width;
-}
-
-/*
-static void draw_canvas_text_char(char ch, int x, int y, uint8_t fg, uint8_t transparent)
-{
-    unsigned char code;
-    int row, col;
-    uint8_t bits, mask;
-
-    code = (unsigned char)ch;
-    for (col = 0; col < 6; col++)
-    {
-        if (col < 5)
-        {
-            RIA.addr1 = XRAM_FONT5x7_ADDR + (unsigned)code * XRAM_FONT5x7_GLYPH_SIZE + (unsigned)col;
-            RIA.step1 = 0;
-            bits = RIA.rw1;
-        }
-        else
-        {
-            bits = 0;
-        }
-        for (row = 0; row < 8; row++)
-        {
-            if (row == 0)
-            {
-                if (!transparent)
-                    raw_set_pixel(x + col, y + row, !fg);
-            }
-            else
-            {
-                mask = (uint8_t)(1u << (row - 1));
-                if (bits & mask)
-                    raw_set_pixel(x + col, y + row, fg);
-                else if (!transparent)
-                    raw_set_pixel(x + col, y + row, !fg);
-            }
-        }
-    }
-}
-
-static void draw_canvas_text(const char *text, int x, int y, uint8_t fg, uint8_t transparent)
-{
-    while (*text)
-    {
-        draw_canvas_text_char(*text, x, y, fg, transparent);
-        x += 6;
-        text++;
-    }
 }
 */
 
@@ -3057,7 +3081,7 @@ static void draw_picker_text_button(const char *text, int x)
 
     draw_picker_box(PICKER_PANEL_COLOR, x, 1, x + PICKER_BUTTON_SIZE - 1, 18);
     px = x + (PICKER_BUTTON_SIZE - ((int)strlen(text) * 6 - 1)) / 2;
-    draw_picker_text(text, px, 6, PICKER_PANEL_COLOR);
+    draw_picker_text_colors(text, px, 6, ui_icon_color(), PICKER_PANEL_COLOR);
 }
 
 static void draw_mouse_coords(int x, int y)
@@ -3638,7 +3662,7 @@ static void wipe_canvas_region(void)
 {
     uint8_t fill_color;
 
-    fill_color = left_color ? 0u : 1u;
+    fill_color = left_color ? BLACK : WHITE;
     operation_cancel_begin();
     if (selection_active)
     {
@@ -3654,7 +3678,7 @@ static void wipe_canvas_region(void)
         set_picker_status("NOSEL");
         return;
     }
-    fill_canvas(fill_color);
+    fill_canvas(BLACK, 0b00000000, 1u, 0u);
     if (operation_was_cancelled())
         set_picker_status("cancelled");
     else
@@ -3769,7 +3793,7 @@ static void startup_after_click(void)
         }
         else
         {
-            fill_canvas(0);
+            fill_canvas(BLACK, 0b00000000, 1u, 0u);
             save_bmp_path = new_name;
             save_canvas_bmp_force(new_name);
         }
@@ -4290,6 +4314,8 @@ static void left_press(int x, int y)
             zoom_area_active = false;
             busy_begin();
             snapshot_save_canvas("TMP/paintHD_zoom.bin");
+            zoom_area_pixels_save();
+            fill_canvas(BLACK, 0b10101010, 4u, 1u);
             zoom_draw_view();
             busy_end();
             zoom_enter_view();
@@ -4320,9 +4346,10 @@ static void left_press(int x, int y)
                 zoom_paint_last_sx = sx;
                 zoom_paint_last_sy = sy;
             }
+            return;
         }
-        return;
     }
+    else
 
     if (paste_preview_active)
     {
@@ -5315,7 +5342,7 @@ int main(int argc, char *argv[]){
         }
         if (key_pressed(HID_F1))
         {
-            if (!prev_f1)
+            if (!zoom_view_active && !prev_f1)
             {
                 save_canvas_bmp_force("paintHD_tmp.bmp");
                 LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
@@ -5329,7 +5356,7 @@ int main(int argc, char *argv[]){
         }
         if (key_pressed(HID_F2))
         {
-            if (!prev_f2)
+            if (!zoom_view_active && !prev_f2)
             {
                 undo_enabled = undo_enabled ? 0u : 1u;
                 set_picker_status(undo_enabled ? "undo ON" : "undo OFF");
@@ -5342,7 +5369,7 @@ int main(int argc, char *argv[]){
         }
         if (key_pressed(HID_F3))
         {
-            if (!prev_f3)
+            if (!zoom_view_active && !prev_f3)
             {
                 busy_begin();
                 operation_cancel_begin();

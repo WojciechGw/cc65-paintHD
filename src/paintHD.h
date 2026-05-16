@@ -101,7 +101,8 @@
 #define ZOOM_FRAME_Y0  104   /* top edge of full area, (480-272)/2 */
 #define ZOOM_FRAME_W   272   /* 34 * 8: 32 pixel blocks + 1 frame block each side */
 #define ZOOM_FRAME_H   272
-#define ZOOM_BUF_ADDR  0xF600u  /* XRAM scratch: 32*32=1024 B */
+#define ZOOM_BUF_ADDR      0xF600u  /* XRAM scratch: 32*32=1024 B */
+#define ZOOM_AREA_BUF_ADDR 0xFA00u  /* canvas area backup: 32*4=128 B (1bpp) */
 
 #define HID_A 0x04
 #define HID_M 0x10
@@ -215,6 +216,8 @@
 */
 
 #define GFX_CANVAS_TYPE GFX_CANVAS_640x480
+#define WHITE 1
+#define BLACK 0
 
 #define COLOR_FROM_RGB8(r,g,b) (((b>>3)<<11)|((g>>3)<<6)|(r>>3))
 #define COLOR_FROM_RGB5(r,g,b) ((b<<11)|(g<<6)|(r))
@@ -225,6 +228,7 @@ uint32_t ticks = 0; // for PAUSE(millis)
 #define PAUSE(millis) ticks=clock(); while(clock() < (ticks + millis)){}
 
 /* Forward declarations used by paintHD.c */
+static void fill_canvas(uint8_t color, uint8_t pattern, uint8_t linestep, uint8_t overlay);
 static void draw_save_button(void);
 static void draw_invert_button(void);
 static void draw_mirror_button(void);
@@ -302,6 +306,7 @@ static void crosshair_show(void);
 static void line_anchor_hide_marker(void);
 static void line_anchor_show_marker(void);
 static void move_picker(int x, int y);
+static void draw_picker_text_button(const char *text, int x);
 static void draw_swap_button(void);
 static void draw_erase_button(void);
 static void draw_invert_button(void);
@@ -312,6 +317,7 @@ static void draw_ellipse_tool_button(void);
 static void draw_all_shape_buttons(void);
 static void zoom_area_hide(void);
 static void zoom_area_show(void);
+static void zoom_area_pixels_save(void);
 static void zoom_cancel(void);
 static void zoom_redraw_icons(void);
 static void zoom_enter_view(void);
@@ -323,6 +329,6 @@ static uint8_t ui_icon_color(void);
 // static void draw_canvas_text(const char *text, int x, int y, uint8_t fg, uint8_t transparent);
 static void draw_canvas_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color);
 static void draw_canvas_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color);
-static int text_width(const char *text);
+// static int text_width(const char *text);
 
 #endif /* PAINT_HD_H */
