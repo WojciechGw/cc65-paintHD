@@ -37,6 +37,7 @@ Mouse and keyboard
 - Ctrl + Shift + LMB or Ctrl + Shift + RMB constrains the line to horizontal or vertical segments.
 - Ctrl + A clears the current selection and returns to normal painting.
 - Ctrl + C copies the current selection to the clipboard file.
+- Ctrl + M enters zoom area selection mode; move the pointer to position the zoom area, then click LMB to open the pixel editor.
 - Ctrl + Q saves the image to "paintHD_save.bmp" and exit.
 - Ctrl + S saves the image to the current save file.
 - Ctrl + V starts opaque paste preview.
@@ -44,10 +45,10 @@ Mouse and keyboard
 - Ctrl + X copies the current selection and clears the selected area.
 - Ctrl + Y performs redo.
 - Ctrl + Z performs undo.
-- F1 shows help information.
+- F1 shows the help screen.
 - F2 toggles undo on and off.
 - F3 saves the current image as an undo checkpoint.
-- Esc cancels selection mode, paste preview, primitive preview, and long operations that support cancellation.
+- Esc cancels selection mode, paste preview, primitive preview, zoom mode, and long operations that support cancellation.
 
 Brush tools
 
@@ -109,6 +110,18 @@ Canvas operations
 - Invert selection inverts only the selected area.
 - Mirror canvas flips the full canvas horizontally or vertically.
 - Mirror selection flips only the selected area horizontally or vertically.
+
+Zoom pixel editor
+
+- Ctrl + M enters zoom area selection mode.
+- The zoom area marker follows the pointer; click LMB on the canvas to open the pixel editor for that area.
+- The pixel editor shows a 32x32 pixel area as 8x8 pixel blocks.
+- The toolbar moves to the bottom-left corner and all icons are inactive while the pixel editor is open.
+- Click LMB on a block to toggle it; hold LMB and drag to paint multiple blocks with the same value.
+- The toolbar coordinate display shows the current block position as [x,y].
+- Press Enter to confirm changes and write them to the canvas.
+- Press Esc to close the pixel editor without applying changes.
+- Entering zoom mode creates an undo checkpoint if undo is enabled.
 
 Undo and redo
 
