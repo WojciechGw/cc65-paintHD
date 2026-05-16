@@ -11,22 +11,22 @@
     (RIA.addr0 = KEYBOARD_INPUT + ((code) >> 3), RIA.step0 = 0, \
      RIA.rw0 & (1 << ((code) & 7)))
 
-// LoadBMP - load BMP file 1-bit 640x480 to XRAM given address.
+// LoadBMP - load BMP file 1-bit 640x480 or smaller to XRAM given address.
 // handle both direction: bottom-up (standard BMP, height > 0)
 // and top-down (height < 0, ie. files saved by SaveBMP).
 // usage : LoadBMP("MSC0:/qrcode.bmp", GFX_DATA);
 //
 
 int LoadBMP(const char *path, uint16_t xram_address, uint16_t height, uint16_t width) {
-    static uint8_t hdr[26];
+    static uint8_t hdr[34];
     uint16_t pixel_offset;
     uint8_t  top_down;
-    uint16_t addr;
-    uint16_t remaining;
+    uint16_t bmp_width_px;
+    int16_t  bmp_height_signed;
+    uint16_t abs_height;
+    uint16_t file_stride;
     uint16_t file_row;
     uint16_t xram_row;
-    uint16_t datasize = height * width; /* width = stride in bytes (pixels/8) */
-    unsigned chunk;
     int fd;
 
     fd = open(path, O_RDONLY);
@@ -34,41 +34,33 @@ int LoadBMP(const char *path, uint16_t xram_address, uint16_t height, uint16_t w
         return -1;
     }
 
-    if (read(fd, hdr, 26) != 26 || hdr[0] != 'B' || hdr[1] != 'M') {
+    if (read(fd, hdr, 34) != 34 || hdr[0] != 'B' || hdr[1] != 'M') {
         close(fd);
         return -1;
     }
 
-    pixel_offset = (uint16_t)hdr[10] | ((uint16_t)hdr[11] << 8);
-    top_down = (hdr[25] & 0x80) != 0;
+    pixel_offset      = (uint16_t)hdr[10] | ((uint16_t)hdr[11] << 8);
+    bmp_width_px      = (uint16_t)hdr[18] | ((uint16_t)hdr[19] << 8);
+    bmp_height_signed = (int16_t)((uint16_t)hdr[22] | ((uint16_t)hdr[23] << 8));
+    top_down          = (bmp_height_signed < 0);
+    abs_height        = top_down ? (uint16_t)(-bmp_height_signed) : (uint16_t)bmp_height_signed;
+
+    /* BMP row stride: round pixel width up to 32-bit boundary */
+    file_stride = ((bmp_width_px + 31u) / 32u) * 4u;
+
+    /* clip to canvas limits */
+    if (abs_height > height)    abs_height  = height;
+    if (file_stride > width)    file_stride = width;
 
     lseek(fd, pixel_offset, SEEK_SET);
 
-    if (top_down) {
-        /* rows in file order == rows in XRAM order: read in chunks <= 0x7FFF */
-        addr = xram_address;
-        remaining = datasize;
-        while (remaining > 0) {
-            if (key_pressed(HID_ESCAPE)) {
-                close(fd);
-                return -2;
-            }
-            chunk = (remaining > 0x7FFF) ? 0x7FFFu : (unsigned)remaining;
-            if (read_xram(addr, chunk, fd) != (int)chunk) break;
-            addr      += (uint16_t)chunk;
-            remaining -= (uint16_t)chunk;
+    for (file_row = 0; file_row < abs_height; file_row++) {
+        if ((file_row & 0x0Fu) == 0u && key_pressed(HID_ESCAPE)) {
+            close(fd);
+            return -2;
         }
-    } else {
-        /* bottom-up: file row 0 -> XRAM row (PC_FB_HEIGHT-1), etc. */
-        for (file_row = 0; file_row < height; file_row++) {
-            if ((file_row & 0x0Fu) == 0u && key_pressed(HID_ESCAPE)) {
-                close(fd);
-                return -2;
-            }
-            xram_row = (uint16_t)(height - 1u - file_row);
-            if (read_xram(xram_address + xram_row * width, width, fd) != (int)width)
-                break;
-        }
+        xram_row = top_down ? file_row : (uint16_t)(abs_height - 1u - file_row);
+        read_xram(xram_address + xram_row * width, file_stride, fd);
     }
 
     close(fd);

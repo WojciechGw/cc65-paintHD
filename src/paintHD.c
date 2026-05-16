@@ -1841,6 +1841,7 @@ static void zoom_area_move(int x, int y)
     ny = y - ZOOM_AREA / 2;
     if (nx < 0) nx = 0;
     if (nx > (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA)) nx = (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA);
+    nx = (nx / 8) * 8;  /* align to byte boundary so pixel save/restore is exact */
     if (ny < 0) ny = 0;
     if (ny > (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA)) ny = (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA);
     if (nx == zoom_area_x && ny == zoom_area_y)
@@ -3753,7 +3754,7 @@ static void startup_after_click(void)
 
     clear_selection();
     busy_begin();
-
+    fill_canvas(BLACK, 0b00000000, 1u, 0u);
     if (g_argc > 1)
     {
         if (LoadBMP(g_argv[1], CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
@@ -4303,7 +4304,8 @@ static void left_press(int x, int y)
             busy_begin();
             snapshot_save_canvas("TMP/paintHD_zoom.bin");
             zoom_area_pixels_save();
-            fill_canvas(BLACK, 0b10101010, 4u, 1u);
+            // fill_canvas(BLACK, 0b11111111, 1u, 1u);
+            // fill_canvas(BLACK, 0b10101010, 4u, 1u);
             zoom_draw_view();
             busy_end();
             zoom_enter_view();

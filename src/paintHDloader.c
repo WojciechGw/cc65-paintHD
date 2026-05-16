@@ -32,7 +32,7 @@ static unsigned startup_bmp_count;
 static unsigned startup_bmp_capacity;
 static unsigned startup_page;
 static f_stat_t startup_dirent;
-static uint8_t startup_bmp_hdr[26];
+static uint8_t startup_bmp_hdr[34];
 
 static uint16_t prng_state = 1u;
 
@@ -626,17 +626,16 @@ static void draw_tiles(void)
     int label_w;
     int fd;
     int ty;
-    int dest_ty;
+
     int bx;
     uint16_t pixel_offset;
-    uint16_t start_row;
     uint8_t top_down;
-    long row_offset;
-    uint8_t value;
-    uint8_t out_byte;
     uint8_t pattern;
-    uint8_t *bmp_chunk;
-    uint8_t *selected_row;
+    uint16_t bmp_width_px;
+    uint16_t abs_height;
+    uint16_t file_stride;
+    int16_t  bmp_h_signed;
+    long row_offset;
     const char *label;
     unsigned file_index;
     unsigned page_base;
@@ -646,7 +645,6 @@ static void draw_tiles(void)
 
     draw_header_bar();
     page_base = startup_page_base();
-    bmp_chunk = malloc(CANVAS_STRIDE * 4u);
     for (i = 0u; i < STARTUP_TILE_COUNT; i++)
     {
         file_index = page_base + i;
@@ -662,51 +660,72 @@ static void draw_tiles(void)
             if (fd >= 0)
             {
                 if (read(fd, startup_bmp_hdr, sizeof(startup_bmp_hdr)) == (int)sizeof(startup_bmp_hdr) &&
-                    startup_bmp_hdr[0] == 'B' && startup_bmp_hdr[1] == 'M' &&
-                    bmp_chunk != 0)
+                    startup_bmp_hdr[0] == 'B' && startup_bmp_hdr[1] == 'M')
                 {
                     pixel_offset = (uint16_t)startup_bmp_hdr[10] | ((uint16_t)startup_bmp_hdr[11] << 8);
-                    top_down = (startup_bmp_hdr[25] & 0x80u) != 0u;
-                    start_row = top_down ? 0u :
-                        (uint16_t)((GFX_CANVAS_HEIGHT - 1u) - ((STARTUP_TILE_HEIGHT - 1u) * 4u));
-                    row_offset = (long)pixel_offset + ((long)start_row * (long)CANVAS_STRIDE);
+                    bmp_width_px  = (uint16_t)startup_bmp_hdr[18] | ((uint16_t)startup_bmp_hdr[19] << 8);
+                    bmp_h_signed  = (int16_t)((uint16_t)startup_bmp_hdr[22] | ((uint16_t)startup_bmp_hdr[23] << 8));
+                    top_down      = (bmp_h_signed < 0);
+                    abs_height    = top_down ? (uint16_t)(-bmp_h_signed) : (uint16_t)bmp_h_signed;
+                    file_stride   = ((bmp_width_px + 31u) / 32u) * 4u;
+                    if (file_stride > CANVAS_STRIDE * 4u) file_stride = CANVAS_STRIDE * 4u;
 
-                    if (lseek(fd, row_offset, SEEK_SET) >= 0)
+                    for (y = tile_y; y <= y2; y++)
                     {
-                        for (ty = 0; ty < (int)STARTUP_TILE_HEIGHT; ty++)
+                        RIA.step0 = 1;
+                        RIA.addr0 = CANVAS_DATA + (unsigned)y * CANVAS_STRIDE + tile_bx;
+                        for (bx = 0; bx < (int)(STARTUP_TILE_WIDTH / 8u); bx++)
+                            RIA.rw0 = 0x00u;
+                    }
+
+                    {
+                        /* bytes per tile row (160px / 8 = 20) */
+                        uint16_t tile_bytes = STARTUP_TILE_WIDTH / 8u;
+                        /* bytes to read per file row: min(file_stride, tile_bytes) */
+                        uint16_t read_bytes = (file_stride < tile_bytes) ? file_stride : tile_bytes;
+                        /* bytes to skip in file after each read to reach next row */
+                        uint16_t skip_bytes = file_stride - read_bytes;
+                        /* rows to copy: min(abs_height, STARTUP_TILE_HEIGHT) */
+                        uint16_t rows_to_show = (abs_height < (uint16_t)STARTUP_TILE_HEIGHT)
+                                                ? abs_height
+                                                : (uint16_t)STARTUP_TILE_HEIGHT;
+                        uint16_t first_file_row;
+                        int dest;
+
+                        if (top_down)
                         {
-                            if (read(fd, bmp_chunk, CANVAS_STRIDE * 4u) != (int)(CANVAS_STRIDE * 4u))
-                                break;
-
-                            selected_row = bmp_chunk;
-                            dest_ty = top_down ? ty : ((int)STARTUP_TILE_HEIGHT - 1 - ty);
-
-                            RIA.step0 = 1;
-                            RIA.addr0 = CANVAS_DATA + (unsigned)(tile_y + dest_ty) * CANVAS_STRIDE + tile_bx;
-                            for (bx = 0; bx < (int)(CANVAS_STRIDE / 4u); bx++)
+                            if (lseek(fd, (long)pixel_offset, SEEK_SET) < 0)
+                                goto tile_close;
+                            for (ty = 0; ty < (int)rows_to_show; ty++)
                             {
-                                out_byte = 0u;
-
-                                value = selected_row[(unsigned)bx * 4u];
-                                if (value & 0x80u) out_byte |= 0x80u;
-                                if (value & 0x08u) out_byte |= 0x40u;
-
-                                value = selected_row[(unsigned)bx * 4u + 1u];
-                                if (value & 0x80u) out_byte |= 0x20u;
-                                if (value & 0x08u) out_byte |= 0x10u;
-
-                                value = selected_row[(unsigned)bx * 4u + 2u];
-                                if (value & 0x80u) out_byte |= 0x08u;
-                                if (value & 0x08u) out_byte |= 0x04u;
-
-                                value = selected_row[(unsigned)bx * 4u + 3u];
-                                if (value & 0x80u) out_byte |= 0x02u;
-                                if (value & 0x08u) out_byte |= 0x01u;
-
-                                RIA.rw0 = out_byte;
+                                read_xram(CANVAS_DATA + (unsigned)(tile_y + ty) * CANVAS_STRIDE + tile_bx,
+                                          read_bytes, fd);
+                                if (skip_bytes > 0)
+                                    lseek(fd, (long)skip_bytes, SEEK_CUR);
+                            }
+                        }
+                        else
+                        {
+                            /* bottom-up: row 0 in file = bottom of image.
+                               To show top rows: seek to last rows_to_show file rows. */
+                            first_file_row = (abs_height > (uint16_t)STARTUP_TILE_HEIGHT)
+                                             ? abs_height - (uint16_t)STARTUP_TILE_HEIGHT
+                                             : 0u;
+                            row_offset = (long)pixel_offset + (long)first_file_row * (long)file_stride;
+                            if (lseek(fd, row_offset, SEEK_SET) < 0)
+                                goto tile_close;
+                            for (ty = 0; ty < (int)rows_to_show; ty++)
+                            {
+                                /* file reads bottom→top of image, tile dest is top→bottom */
+                                dest = (int)rows_to_show - 1 - ty;
+                                read_xram(CANVAS_DATA + (unsigned)(tile_y + dest) * CANVAS_STRIDE + tile_bx,
+                                          read_bytes, fd);
+                                if (skip_bytes > 0)
+                                    lseek(fd, (long)skip_bytes, SEEK_CUR);
                             }
                         }
                     }
+                    tile_close:;
                 }
                 close(fd);
             }
@@ -738,8 +757,6 @@ static void draw_tiles(void)
             draw_text(label, tile_x + 2, label_y + 1, tile_x + label_w - 3, WHITE, BLACK);
         }
     }
-    if (bmp_chunk != 0)
-        free(bmp_chunk);
     startup_save_page_cache(startup_page);
 }
 
