@@ -53,6 +53,13 @@ static int crosshair_y;
 static bool line_anchor_marker_visible;
 static int line_anchor_marker_x;
 static int line_anchor_marker_y;
+static bool zoom_area_active;
+static bool zoom_area_visible;
+static bool zoom_view_active;
+static int zoom_area_x;
+static int zoom_area_y;
+static int zoom_area_marker_x;
+static int zoom_area_marker_y;
 static uint8_t drawing_button;
 static uint8_t left_draw_armed;
 static uint8_t right_draw_armed;
@@ -354,6 +361,8 @@ static void crosshair_hide(void);
 static void crosshair_show(void);
 static void line_anchor_hide_marker(void);
 static void line_anchor_show_marker(void);
+static void zoom_area_hide(void);
+static void zoom_area_show(void);
 
 static uint8_t snapshot_save_canvas(const char *path)
 {
@@ -1759,6 +1768,134 @@ static void line_anchor_show_marker(void)
     line_anchor_marker_y = line_anchor_y;
     line_anchor_toggle_marker();
     line_anchor_marker_visible = true;
+}
+
+static void zoom_area_toggle(void)
+{
+    int x, y;
+    int x2 = zoom_area_marker_x + ZOOM_AREA - 1;
+    int y2 = zoom_area_marker_y + ZOOM_AREA - 1;
+    for (x = zoom_area_marker_x; x <= x2; x++)
+    {
+        raw_toggle_pixel(x, zoom_area_marker_y);
+        raw_toggle_pixel(x, y2);
+    }
+    for (y = zoom_area_marker_y + 1; y < y2; y++)
+    {
+        raw_toggle_pixel(zoom_area_marker_x, y);
+        raw_toggle_pixel(x2, y);
+    }
+}
+
+static void zoom_area_hide(void)
+{
+    if (!zoom_area_visible)
+        return;
+    zoom_area_toggle();
+    zoom_area_visible = false;
+}
+
+static void zoom_area_show(void)
+{
+    if (zoom_area_visible)
+        return;
+    zoom_area_marker_x = zoom_area_x;
+    zoom_area_marker_y = zoom_area_y;
+    zoom_area_toggle();
+    zoom_area_visible = true;
+}
+
+static void zoom_area_move(int x, int y)
+{
+    int nx, ny;
+    nx = x - ZOOM_AREA / 2;
+    ny = y - ZOOM_AREA / 2;
+    if (nx < 0) nx = 0;
+    if (nx > (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA)) nx = (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA);
+    if (ny < 0) ny = 0;
+    if (ny > (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA)) ny = (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA);
+    if (nx == zoom_area_x && ny == zoom_area_y)
+        return;
+    zoom_area_hide();
+    zoom_area_x = nx;
+    zoom_area_y = ny;
+    zoom_area_show();
+}
+
+static void zoom_draw_view(void)
+{
+    int x, y, sx, sy, dx, dy, px, py;
+    uint8_t v;
+
+    /* read source pixels into XRAM scratch before touching the canvas */
+    RIA.addr1 = ZOOM_BUF_ADDR;
+    RIA.step1 = 1;
+    for (sy = 0; sy < ZOOM_AREA; sy++)
+        for (sx = 0; sx < ZOOM_AREA; sx++)
+            RIA.rw1 = raw_get_pixel(zoom_area_x + sx, zoom_area_y + sy);
+
+    /* clear view area including 1-px border:
+       ZOOM_VIEW_X0=176=22*8 and ZOOM_VIEW_W=288=36*8 are byte-aligned.
+       border pixel x=175 (byte 21 bit7) and x=464 (byte 58 bit0) are handled
+       by the white-border pass below which overwrites them anyway.
+       y range: ZOOM_VIEW_Y0-1=95 .. ZOOM_VIEW_Y0+ZOOM_VIEW_H=384 (290 rows)
+       x byte range: 22..57 (36 bytes = 288 pixels) */
+    {
+        int cy;
+        int i;
+        for (cy = ZOOM_VIEW_Y0 - 1; cy <= ZOOM_VIEW_Y0 + ZOOM_VIEW_H; cy++)
+        {
+            RIA.addr0 = (unsigned)cy * CANVAS_STRIDE + 22u;
+            RIA.step0 = 1;
+            for (i = 0; i < 36; i++)
+                RIA.rw0 = 0;
+        }
+    }
+
+    /* white border */
+    for (x = ZOOM_VIEW_X0 - 1; x <= ZOOM_VIEW_X0 + ZOOM_VIEW_W; x++)
+    {
+        raw_set_pixel(x, ZOOM_VIEW_Y0 - 1, 1);
+        raw_set_pixel(x, ZOOM_VIEW_Y0 + ZOOM_VIEW_H, 1);
+    }
+    for (y = ZOOM_VIEW_Y0; y < ZOOM_VIEW_Y0 + ZOOM_VIEW_H; y++)
+    {
+        raw_set_pixel(ZOOM_VIEW_X0 - 1, y, 1);
+        raw_set_pixel(ZOOM_VIEW_X0 + ZOOM_VIEW_W, y, 1);
+    }
+
+    /* dotted grid: vertical and horizontal lines every ZOOM_STEP px
+       (on block boundaries), dot pattern 1-on / 2-off */
+    for (sx = 0; sx <= ZOOM_AREA; sx++)
+    {
+        x = ZOOM_GRID_X0 + sx * ZOOM_STEP - 1;
+        for (y = ZOOM_VIEW_Y0; y < ZOOM_VIEW_Y0 + ZOOM_VIEW_H; y++)
+            if ((y - ZOOM_VIEW_Y0) % 3 == 0)
+                raw_set_pixel(x, y, 1);
+    }
+    for (sy = 0; sy <= ZOOM_AREA; sy++)
+    {
+        y = ZOOM_GRID_Y0 + sy * ZOOM_STEP - 1;
+        for (x = ZOOM_VIEW_X0; x < ZOOM_VIEW_X0 + ZOOM_VIEW_W; x++)
+            if ((x - ZOOM_VIEW_X0) % 3 == 0)
+                raw_set_pixel(x, y, 1);
+    }
+
+    /* pixel blocks from XRAM scratch */
+    RIA.addr1 = ZOOM_BUF_ADDR;
+    RIA.step1 = 1;
+    for (sy = 0; sy < ZOOM_AREA; sy++)
+    {
+        for (sx = 0; sx < ZOOM_AREA; sx++)
+        {
+            v = RIA.rw1;
+            dx = ZOOM_GRID_X0 + sx * ZOOM_STEP;
+            dy = ZOOM_GRID_Y0 + sy * ZOOM_STEP;
+            for (py = 0; py < ZOOM_DOT; py++)
+                for (px = 0; px < ZOOM_DOT; px++)
+                    raw_set_pixel(dx + px, dy + py, v);
+        }
+    }
 }
 
 static void paste_preview_cancel(void)
@@ -3909,6 +4046,7 @@ static void toggle_vert_brush_flip(void)
 
 static void canvas_modify_begin(void)
 {
+    zoom_area_hide();
     line_anchor_hide_marker();
     crosshair_hide();
     paste_preview_hide();
@@ -3928,6 +4066,7 @@ static void drawing_session_begin(void)
 {
     if (drawing_session_active)
         return;
+    zoom_area_hide();
     line_anchor_hide_marker();
     crosshair_hide();
     paste_preview_hide();
@@ -3965,6 +4104,33 @@ static void left_press(int x, int y)
     {
         mirror_click_pending = 0;
         mirror_click_deadline = 0;
+    }
+
+    if (zoom_area_active)
+    {
+        if (num < 0)
+        {
+            zoom_area_hide();
+            zoom_area_active = false;
+            busy_begin();
+            snapshot_save_canvas("TMP/paintHD_zoom.bin");
+            zoom_draw_view();
+            busy_end();
+            zoom_view_active = true;
+            picker_hover_status = 0;
+            set_picker_hover_status("ZOOM");
+        }
+        return;
+    }
+
+    if (zoom_view_active)
+    {
+        busy_begin();
+        snapshot_load_canvas("TMP/paintHD_zoom.bin");
+        busy_end();
+        zoom_view_active = false;
+        set_picker_status("");
+        return;
     }
 
     if (paste_preview_active)
@@ -4649,6 +4815,8 @@ static void mouse(void)
 
     if (x != prev_display_x || y != prev_display_y)
     {
+        if (zoom_area_active)
+            zoom_area_move(x, y);
         if (crosshair_visible)
         {
             crosshair_hide();
@@ -4659,7 +4827,15 @@ static void mouse(void)
         prev_display_y = y;
     }
 
-    if (!canvas_input_locked() && !paste_preview_active &&
+    if (zoom_area_active)
+    {
+        set_picker_hover_status("set area to zoom");
+    }
+    else if (zoom_view_active)
+    {
+        set_picker_hover_status("ZOOM");
+    }
+    else if (!canvas_input_locked() && !paste_preview_active &&
         active_tool == TOOL_BRUSH && brush_shape != SHAPE_FILL &&
         picker_num(x, y) < 0 && key_pressed(HID_LEFT_CTRL) &&
         !alt_pressed() &&
@@ -4714,6 +4890,7 @@ int main(int argc, char *argv[]){
     static uint8_t prev_ctrl_y;
     static uint8_t prev_ctrl_z;
     static uint8_t prev_ctrl_alt_v;
+    static uint8_t prev_ctrl_m;
     static uint8_t prev_escape;
     static uint8_t prev_f1;
     static uint8_t prev_f2;
@@ -4868,7 +5045,21 @@ int main(int argc, char *argv[]){
         {
             if (!prev_escape)
             {
-                if (paste_preview_active)
+                if (zoom_area_active)
+                {
+                    zoom_area_hide();
+                    zoom_area_active = false;
+                    set_picker_status("");
+                }
+                else if (zoom_view_active)
+                {
+                    busy_begin();
+                    snapshot_load_canvas("TMP/paintHD_zoom.bin");
+                    busy_end();
+                    zoom_view_active = false;
+                    set_picker_status("");
+                }
+                else if (paste_preview_active)
                     paste_preview_cancel();
                 else if (primitive_mode_active())
                     exit_primitive_mode();
@@ -5034,6 +5225,32 @@ int main(int argc, char *argv[]){
         else
         {
             prev_ctrl_v = 0;
+        }
+        if (!canvas_input_locked() && !paste_preview_active && !zoom_view_active &&
+            key_pressed(HID_LEFT_CTRL) && !alt_pressed() && key_pressed(HID_M))
+        {
+            if (!prev_ctrl_m)
+            {
+                if (!zoom_area_active)
+                {
+                    if (crosshair_active)
+                    {
+                        crosshair_hide();
+                        crosshair_active = false;
+                    }
+                    zoom_area_x = -1;
+                    zoom_area_y = -1;
+                    zoom_area_move(mouse_pos_x, mouse_pos_y);
+                    zoom_area_active = true;
+                    picker_hover_status = 0;
+                    set_picker_hover_status("set area to zoom");
+                }
+                prev_ctrl_m = 1u;
+            }
+        }
+        else
+        {
+            prev_ctrl_m = 0;
         }
         mouse();
     }

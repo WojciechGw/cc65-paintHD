@@ -91,7 +91,20 @@
 
 #define CANVAS_STRIDE 80u
 
+#define ZOOM_AREA     32
+#define ZOOM_DOT      8
+#define ZOOM_GAP      1
+#define ZOOM_STEP     9
+#define ZOOM_VIEW_W   288
+#define ZOOM_VIEW_H   288
+#define ZOOM_VIEW_X0  176
+#define ZOOM_VIEW_Y0  96
+#define ZOOM_GRID_X0  (ZOOM_VIEW_X0 + 1)
+#define ZOOM_GRID_Y0  (ZOOM_VIEW_Y0 + 1)
+#define ZOOM_BUF_ADDR 0xF600u  /* XRAM scratch: 32*32=1024 B, after fonticons@0xEC00+2478 */
+
 #define HID_A 0x04
+#define HID_M 0x10
 #define HID_C 0x06
 #define HID_Q 0x14
 #define HID_S 0x16
