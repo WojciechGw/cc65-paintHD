@@ -118,6 +118,7 @@
 #define HID_X 0x1B
 #define HID_Y 0x1C
 #define HID_Z 0x1D
+#define HID_ENTER 0x28
 #define HID_LEFT_CTRL 0xE0
 #define HID_LEFT_SHIFT 0xE1
 #define HID_LEFT_ALT 0xE2

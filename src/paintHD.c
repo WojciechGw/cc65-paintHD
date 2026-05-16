@@ -364,6 +364,8 @@ static void line_anchor_show_marker(void);
 static void zoom_area_hide(void);
 static void zoom_area_show(void);
 static void zoom_cancel(void);
+static void zoom_redraw_block(int sx, int sy);
+static void zoom_apply_changes(void);
 
 static uint8_t snapshot_save_canvas(const char *path)
 {
@@ -1830,6 +1832,47 @@ static void zoom_area_move(int x, int y)
     zoom_area_x = nx;
     zoom_area_y = ny;
     zoom_area_show();
+}
+
+static void zoom_redraw_block(int sx, int sy)
+{
+    int py;
+    uint8_t v, bv;
+    unsigned row_addr;
+
+    RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
+    RIA.step1 = 0;
+    v = RIA.rw1;
+
+    for (py = 0; py < ZOOM_DOT; py++)
+    {
+        row_addr = (unsigned)(ZOOM_FRAME_Y0 + (sy + 1) * ZOOM_DOT + py)
+                   * CANVAS_STRIDE + 23u + 1u + (unsigned)sx;
+        RIA.addr0 = row_addr;
+        RIA.step0 = 0;
+        bv = v ? 0xFF : 0x00;
+        if (py == 1 || py == 3 || py == 5) bv ^= 0x01;
+        if (py == 7) bv ^= 0x55;
+        RIA.rw0 = bv;
+    }
+}
+
+static void zoom_apply_changes(void)
+{
+    int sx, sy;
+    uint8_t v;
+
+    snapshot_load_canvas("TMP/paintHD_zoom.bin");
+    RIA.addr1 = ZOOM_BUF_ADDR;
+    RIA.step1 = 1;
+    for (sy = 0; sy < ZOOM_AREA; sy++)
+        for (sx = 0; sx < ZOOM_AREA; sx++)
+        {
+            v = RIA.rw1;
+            raw_set_pixel(zoom_area_x + sx, zoom_area_y + sy, v ? 1 : 0);
+        }
+    zoom_view_active = false;
+    set_picker_status("");
 }
 
 static void zoom_draw_view(void)
@@ -4140,11 +4183,20 @@ static void left_press(int x, int y)
 
     if (zoom_view_active)
     {
-        busy_begin();
-        snapshot_load_canvas("TMP/paintHD_zoom.bin");
-        busy_end();
-        zoom_view_active = false;
-        set_picker_status("");
+        if (num < 0)
+        {
+            int bx = x - (int)ZOOM_VIEW_X0;
+            int by = y - (int)ZOOM_VIEW_Y0;
+            if (bx >= 0 && bx < (int)ZOOM_VIEW_W && by >= 0 && by < (int)ZOOM_VIEW_H)
+            {
+                int sx = bx / ZOOM_DOT;
+                int sy = by / ZOOM_DOT;
+                RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
+                RIA.step1 = 0;
+                RIA.rw1 = RIA.rw1 ? 0 : 1;
+                zoom_redraw_block(sx, sy);
+            }
+        }
         return;
     }
 
@@ -4911,6 +4963,7 @@ int main(int argc, char *argv[]){
     static uint8_t prev_ctrl_alt_v;
     static uint8_t prev_ctrl_m;
     static uint8_t prev_escape;
+    static uint8_t prev_enter;
     static uint8_t prev_f1;
     static uint8_t prev_f2;
     static uint8_t prev_f3;
@@ -5008,6 +5061,7 @@ int main(int argc, char *argv[]){
     prev_ctrl_z = 0;
     prev_ctrl_alt_v = 0;
     prev_escape = 0;
+    prev_enter = 0;
     prev_f2 = 0;
     prev_f3 = 0;
     clipboard_valid = 0;
@@ -5059,6 +5113,22 @@ int main(int argc, char *argv[]){
         else
         {
             prev_ctrl_a = 0;
+        }
+        if (zoom_view_active && key_pressed(HID_ENTER))
+        {
+            if (!prev_enter)
+            {
+                prev_enter = 1u;
+                canvas_modify_begin();
+                busy_begin();
+                zoom_apply_changes();
+                busy_end();
+                canvas_modify_end();
+            }
+        }
+        else
+        {
+            prev_enter = 0;
         }
         if (key_pressed(HID_ESCAPE))
         {
