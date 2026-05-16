@@ -168,6 +168,19 @@ Pressing `F1` temporarily replaces the canvas with the help image
 (`ROM:paintHDhelp.bmp`). Click `LMB` anywhere to return to the canvas.
 The current file and dirty state are not affected.
 
+### Zoom Pixel Editor
+
+- `Ctrl + M` enters zoom area selection mode.
+- Move the pointer to position the zoom area, then click `LMB` to open the pixel editor.
+- The pixel editor shows a 32×32 pixel area magnified as 8×8 pixel blocks.
+- All toolbar icons are dimmed and disabled while the pixel editor is open; `F1`, `F2`, and `F3` are also disabled.
+- The toolbar can still be moved by dragging its handle during zoom.
+- Click `LMB` on a block to toggle it; hold `LMB` and drag to paint multiple blocks with the same value.
+- The toolbar coordinate display shows the current block position as `[x,y]`.
+- Press `Enter` to confirm changes and write them to the canvas.
+- Press `Esc` to close the pixel editor without applying changes.
+- Entering zoom mode creates an undo checkpoint if undo is enabled.
+
 ### Long Operation Cancellation
 
 Long-running operations support `Esc` cancellation, including:

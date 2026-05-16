@@ -4487,6 +4487,8 @@ static void left_press(int x, int y)
         has_line_anchor = false;
         ctrl_line_session_active = false;
     }
+    if (zoom_view_active)
+        return;
     if (num == 9)
     {
         now = clock();

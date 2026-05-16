@@ -117,7 +117,8 @@ Zoom pixel editor
 - Ctrl + M enters zoom area selection mode.
 - The zoom area marker follows the pointer; click LMB on the canvas to open the pixel editor for that area.
 - The pixel editor shows a 32x32 pixel area as 8x8 pixel blocks.
-- The toolbar moves to the bottom-left corner and all icons are inactive while the pixel editor is open.
+- All toolbar icons are dimmed and disabled while the pixel editor is open; F1, F2, and F3 are also disabled.
+- The toolbar can still be moved by dragging its handle during zoom.
 - Click LMB on a block to toggle it; hold LMB and drag to paint multiple blocks with the same value.
 - The toolbar coordinate display shows the current block position as [x,y].
 - Press Enter to confirm changes and write them to the canvas.
