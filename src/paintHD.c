@@ -363,6 +363,7 @@ static void line_anchor_hide_marker(void);
 static void line_anchor_show_marker(void);
 static void zoom_area_hide(void);
 static void zoom_area_show(void);
+static void zoom_cancel(void);
 
 static uint8_t snapshot_save_canvas(const char *path)
 {
@@ -1794,6 +1795,24 @@ static void zoom_area_show(void)
     zoom_area_marker_y = zoom_area_y;
     zoom_area_toggle();
     zoom_area_visible = true;
+}
+
+static void zoom_cancel(void)
+{
+    if (zoom_area_active)
+    {
+        zoom_area_hide();
+        zoom_area_active = false;
+        set_picker_status("");
+    }
+    if (zoom_view_active)
+    {
+        busy_begin();
+        snapshot_load_canvas("TMP/paintHD_zoom.bin");
+        busy_end();
+        zoom_view_active = false;
+        set_picker_status("");
+    }
 }
 
 static void zoom_area_move(int x, int y)
@@ -4477,6 +4496,8 @@ static void right_press(int x, int y)
         mirror_click_deadline = 0;
     }
 
+    zoom_cancel();
+
     if (paste_preview_active)
     {
         paste_preview_cancel();
@@ -4762,6 +4783,7 @@ static void mouse(void)
     if (released & 2) right_release();
     if (pressed & 4)
     {
+        zoom_cancel();
         if (crosshair_active)
         {
             crosshair_hide();
@@ -4778,6 +4800,7 @@ static void mouse(void)
     rw = RIA.rw0;
     if (rw != prev_wheel)
     {
+        zoom_cancel();
         change_brush_size((int8_t)(rw - prev_wheel));
         prev_wheel = rw;
     }
