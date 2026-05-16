@@ -5451,7 +5451,7 @@ int main(int argc, char *argv[]){
         {
             if (!prev_ctrl_m)
             {
-                if (!zoom_area_active)
+                if (!zoom_area_active && prepare_undo_step())
                 {
                     if (crosshair_active)
                     {
