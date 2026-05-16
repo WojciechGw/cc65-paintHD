@@ -71,7 +71,6 @@ static uint8_t circle_cached_size;
 static uint8_t circle_row_left[BRUSH_MAX];
 static uint8_t circle_row_right[BRUSH_MAX];
 static int picker_x, picker_y;
-// static int zoom_saved_picker_x, zoom_saved_picker_y;
 static int drag_x, drag_y;
 static int line_anchor_x, line_anchor_y;
 static int line_x, line_y;
@@ -1807,9 +1806,6 @@ static void zoom_area_pixels_save(void)
 
 static void zoom_enter_view(void)
 {
-//    zoom_saved_picker_x = picker_x;
-//    zoom_saved_picker_y = picker_y;
-    // move_picker(0, (int)GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
     zoom_view_active = true;
     zoom_redraw_icons();
 }
@@ -1817,7 +1813,6 @@ static void zoom_enter_view(void)
 static void zoom_exit_view(void)
 {
     zoom_view_active = false;
-    // move_picker(zoom_saved_picker_x, zoom_saved_picker_y);
     zoom_redraw_icons();
 }
 
@@ -1924,24 +1919,15 @@ static void zoom_draw_view(void)
         }
     }
 
-    /* clear full area + 1px border:
-       ZOOM_FRAME_X0=184=23*8 byte-aligned, ZOOM_FRAME_W=272=34*8
-       bytes 23..56 (34 bytes), rows 103..376 (274 rows) */
-    for (cy = ZOOM_FRAME_Y0 - 1; cy <= ZOOM_FRAME_Y0 + ZOOM_FRAME_H; cy++)
-    {
-        RIA.addr0 = (unsigned)cy * CANVAS_STRIDE + 23u;
-        RIA.step0 = 1;
-        for (i = 0; i < 34; i++)
-            RIA.rw0 = 0;
-    }
-
-    /* draw 34x34 blocks (sy=-1..32: top frame + 32 pixel rows + bottom frame)
+    /* 
+       draw 34x34 blocks (sy=-1..32: top frame + 32 pixel rows + bottom frame)
        port 0: byte write (addr0+step0=1, 34 bytes/row)
        port 1: XRAM read  (addr1+step1=1, 32 pixels/row)
        ports 0 and 1 are independent — safe to use simultaneously
        grid via XOR on byte_val:
          vertical:   py=1,3,5 -> XOR 0x01 (bit 0 = right pixel of block)
-         horizontal: py=7     -> XOR 0x55 (bits 6,4,2,0 = px 1,3,5,7) */
+         horizontal: py=7     -> XOR 0x55 (bits 6,4,2,0 = px 1,3,5,7) 
+    */
     for (sy = -1; sy <= ZOOM_AREA; sy++)
     {
         for (py = 0; py < ZOOM_DOT; py++)
@@ -1960,19 +1946,21 @@ static void zoom_draw_view(void)
                 {
                     v = RIA.rw1;
                     byte_val = v ? 0xFF : 0x00;
-                    if (py == 1 || py == 3 || py == 5) byte_val ^= 0x01;
-                    if (py == 7) byte_val ^= 0x55;
+                    if (py == 1 || py == 3 || py == 5) byte_val ^= 0b00000001;
+                    if (py == 7) byte_val ^= 0b01010101;
                     RIA.rw0 = byte_val;
                 }
-                RIA.rw0 = 0x00; /* right frame block */
+                RIA.rw0 = (sy > 5 && py == 0 && !(sy % 8)) ? 0b11111111 : 0b00000000; /* right frame block */
             }
             else
             {
                 for (i = 0; i < 33; i++){
-                    if(sy == -1 && py == 7){
-                        RIA.rw0 = (i >= 1 && i <= 32) ? 0x55 : 0x01;
+                    if(sy == -1 && i < 25 && py < 7 && !(i % 8)) {
+                        RIA.rw0 = 0b00000001;
+                    } else if(sy == -1 && py == 7){
+                        RIA.rw0 = (i >= 1 && i <= 32) ? 0b01010101 : 0b00000001;
                     } else {
-                        RIA.rw0 = 0x00;
+                        RIA.rw0 = 0b00000000;
                     }
                 }
             }
