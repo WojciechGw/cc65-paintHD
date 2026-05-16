@@ -5219,7 +5219,7 @@ int main(int argc, char *argv[]){
     #endif
     snapshot_refresh_current();
     draw_picker();
-    move_picker(((GFX_CANVAS_WIDTH - (PICKER_WIDTH))/2), GFX_CANVAS_HEIGHT - PICKER_HEIGHT);
+    move_picker(((GFX_CANVAS_WIDTH - (PICKER_WIDTH))/2), GFX_CANVAS_HEIGHT - (PICKER_HEIGHT * 2));
     draw_pointer(POINTER_arrow);
 
     LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
