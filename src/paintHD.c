@@ -1895,7 +1895,7 @@ static void zoom_apply_changes(void)
 
 static void zoom_draw_view(void)
 {
-    int sx, sy, py, i, cy;
+    int sx, sy, py, i;
     uint8_t v, byte_val;
     unsigned row_addr;
 
@@ -4304,8 +4304,6 @@ static void left_press(int x, int y)
             busy_begin();
             snapshot_save_canvas("TMP/paintHD_zoom.bin");
             zoom_area_pixels_save();
-            // fill_canvas(BLACK, 0b11111111, 1u, 1u);
-            // fill_canvas(BLACK, 0b10101010, 4u, 1u);
             zoom_draw_view();
             busy_end();
             zoom_enter_view();
@@ -5254,8 +5252,11 @@ int main(int argc, char *argv[]){
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     #ifdef RELEASE
-    PAUSE(200);
-    clear_canvas_random_blocks8();
+    if(argc == 1)
+    {
+        PAUSE(200);
+        clear_canvas_random_blocks8();
+    }
     #endif
     snapshot_refresh_current();
     draw_picker();
@@ -5439,7 +5440,9 @@ int main(int argc, char *argv[]){
         {
             if (!prev_ctrl_q)
             {
+                char arg[] = "RET";
                 save_canvas_bmp_force("paintHD_save.bmp");
+                ria_execl("paintHDloader.rp6502", arg, NULL);
                 return 0;
             }
         }

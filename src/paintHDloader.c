@@ -9,7 +9,7 @@
 
 #define RELEASE
 
-// #define WITHMALLOC
+#define WITHMALLOC
 
 #ifdef WITHMALLOC
     void *__fastcall__ argv_mem(size_t size) { return malloc(size); }
@@ -876,14 +876,17 @@ int main(int argc, char *argv[])
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     xreg_ria_keyboard(KEYBOARD_INPUT);
-    PAUSE(PAUSE_TICKS_START);
+    if(argc == 1)
+    {
+        PAUSE(PAUSE_TICKS_START);
+        clear_canvas_random_blocks8();
+    }
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, POINTER_STRUCT, GFX_PLANE_2);
     mouse_pos_x = (int16_t)(GFX_CANVAS_WIDTH / 2u);
     mouse_pos_y = (int16_t)(GFX_CANVAS_HEIGHT / 2u);
     xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, x_pos_px, mouse_pos_x);
     xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, y_pos_px, mouse_pos_y);
     draw_pointer(POINTER_hourglass);
-    clear_canvas_random_blocks8();
     startup_collect_bmps();
     if (startup_bmp_count == 0u)
     {
