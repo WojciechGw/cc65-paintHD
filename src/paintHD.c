@@ -190,9 +190,6 @@ static void mouse_init(void)
     set_irq(mouse_irq_fn, &mouse_stack, sizeof(mouse_stack));
 }
 
-static void draw_picker_status(void);
-static void draw_pointer(uint8_t type);
-
 static void busy_begin(void)
 {
     busy_mode = 1u;
@@ -257,61 +254,6 @@ static uint8_t operation_was_cancelled(void)
     return operation_cancelled;
 }
 
-/* unused but do not touch
-static const uint8_t clear_pixel_mask_order[8][8] = {
-    {0x80u, 0x40u, 0x20u, 0x10u, 0x08u, 0x04u, 0x02u, 0x01u},
-    {0x01u, 0x02u, 0x04u, 0x08u, 0x10u, 0x20u, 0x40u, 0x80u},
-    {0x40u, 0x10u, 0x04u, 0x01u, 0x80u, 0x20u, 0x08u, 0x02u},
-    {0x02u, 0x08u, 0x20u, 0x80u, 0x01u, 0x04u, 0x10u, 0x40u},
-    {0x20u, 0x04u, 0x80u, 0x01u, 0x40u, 0x02u, 0x10u, 0x08u},
-    {0x08u, 0x10u, 0x02u, 0x40u, 0x01u, 0x80u, 0x04u, 0x20u},
-    {0x10u, 0x80u, 0x08u, 0x01u, 0x20u, 0x02u, 0x40u, 0x04u},
-    {0x04u, 0x40u, 0x02u, 0x20u, 0x01u, 0x10u, 0x08u, 0x80u}
-};
-
-static void clear_canvas_random_pixels(void)
-{
-    unsigned remaining;
-    unsigned total;
-    unsigned byte_index;
-    uint8_t bit_index;
-    uint8_t value;
-    uint8_t mask;
-    const uint8_t *order;
-
-    total = CANVAS_STRIDE * GFX_CANVAS_HEIGHT;
-    byte_index = (unsigned)prng_next();
-    byte_index |= (unsigned)((unsigned)prng_next() << 8);
-    if (byte_index >= total)
-        byte_index -= total;
-
-    RIA.step0 = 0;
-    for (remaining = total; remaining != 0u; remaining--)
-    {
-        if ((remaining & 0x3Fu) == 0u && operation_cancel_requested())
-            break;
-        RIA.addr0 = CANVAS_DATA + byte_index;
-        value = RIA.rw0;
-        if (value != 0u)
-        {
-            order = clear_pixel_mask_order[prng_next() & 7u];
-            for (bit_index = 0; bit_index < 8u; bit_index++)
-            {
-                mask = order[bit_index];
-                if (!(value & mask))
-                    continue;
-                value &= (uint8_t)~mask;
-                RIA.rw0 = value;
-            }
-        }
-
-        byte_index += 73u;
-        if (byte_index >= total)
-            byte_index -= total;
-    }
-}
-*/
-
 static void clear_canvas_random_blocks8(void)
 {
     unsigned cleared;
@@ -355,17 +297,6 @@ static void clear_canvas_random_blocks8(void)
             state ^= 0x1C80u;
     }
 }
-
-
-static void crosshair_hide(void);
-static void crosshair_show(void);
-static void line_anchor_hide_marker(void);
-static void line_anchor_show_marker(void);
-static void zoom_area_hide(void);
-static void zoom_area_show(void);
-static void zoom_cancel(void);
-static void zoom_redraw_block(int sx, int sy);
-static void zoom_apply_changes(void);
 
 static uint8_t snapshot_save_canvas(const char *path)
 {
@@ -1942,6 +1873,11 @@ static void zoom_draw_view(void)
             }
         }
     }
+    draw_canvas_text(" ZOOM ",
+                     ZOOM_FRAME_X0, (ZOOM_FRAME_Y0 - 2u), (GFX_CANVAS_WIDTH - 1), 0u, 1u);
+    draw_canvas_text(" [LMB] toggle pixel [ENTER] confirm [ESC] abandon ",
+                     ZOOM_FRAME_X0, (ZOOM_FRAME_Y0 + ZOOM_FRAME_H - 4), (GFX_CANVAS_WIDTH - 1), 0u, 1u);
+
 }
 
 static void paste_preview_cancel(void)
@@ -2889,6 +2825,107 @@ static char *append_coord_value(char *out, int value)
     }
     return out;
 }
+
+static void draw_canvas_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color)
+{
+    unsigned char code;
+    int row, col;
+    uint8_t bits;
+    uint8_t mask;
+
+    code = (unsigned char)ch;
+    for (col = 0; col < 6; col++)
+        raw_set_pixel(px + col, py-1, bg_color);
+    for (row = 0; row < 8; row++)
+    {
+        mask = (uint8_t)(1u << row);
+        for (col = 0; col < 5; col++)
+        {
+            RIA.step0 = 0;
+            RIA.addr0 = XRAM_FONT5x7_ADDR + (unsigned)code * XRAM_FONT5x7_GLYPH_SIZE + (unsigned)col;
+            bits = RIA.rw0;
+            raw_set_pixel(px + col, py + row, (bits & mask) ? fg_color : bg_color);
+        }
+        raw_set_pixel(px + 5, py + row, bg_color);
+    }
+    for (col = 0; col < 6; col++)
+        raw_set_pixel(px + col, py + 8, bg_color);
+}
+
+static void draw_canvas_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color)
+{
+    while (*text != '\0' && (px + 4) <= max_x)
+    {
+        draw_canvas_text_char(*text, px, py, fg_color, bg_color);
+        px += 6;
+        text++;
+    }
+}
+
+static int text_width(const char *text)
+{
+    int width;
+
+    width = 0;
+    while (*text != '\0')
+    {
+        width += 6;
+        text++;
+    }
+    if (width != 0)
+        width--;
+    return width;
+}
+
+/*
+static void draw_canvas_text_char(char ch, int x, int y, uint8_t fg, uint8_t transparent)
+{
+    unsigned char code;
+    int row, col;
+    uint8_t bits, mask;
+
+    code = (unsigned char)ch;
+    for (col = 0; col < 6; col++)
+    {
+        if (col < 5)
+        {
+            RIA.addr1 = XRAM_FONT5x7_ADDR + (unsigned)code * XRAM_FONT5x7_GLYPH_SIZE + (unsigned)col;
+            RIA.step1 = 0;
+            bits = RIA.rw1;
+        }
+        else
+        {
+            bits = 0;
+        }
+        for (row = 0; row < 8; row++)
+        {
+            if (row == 0)
+            {
+                if (!transparent)
+                    raw_set_pixel(x + col, y + row, !fg);
+            }
+            else
+            {
+                mask = (uint8_t)(1u << (row - 1));
+                if (bits & mask)
+                    raw_set_pixel(x + col, y + row, fg);
+                else if (!transparent)
+                    raw_set_pixel(x + col, y + row, !fg);
+            }
+        }
+    }
+}
+
+static void draw_canvas_text(const char *text, int x, int y, uint8_t fg, uint8_t transparent)
+{
+    while (*text)
+    {
+        draw_canvas_text_char(*text, x, y, fg, transparent);
+        x += 6;
+        text++;
+    }
+}
+*/
 
 #ifndef XRAM_FONT5x7
 static void draw_picker_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color)
@@ -5344,3 +5381,62 @@ int main(int argc, char *argv[]){
         mouse();
     }
 }
+
+/*
+  SCRATCHPAD - do not touch from here
+*/
+
+/* unused but do not touch
+static const uint8_t clear_pixel_mask_order[8][8] = {
+    {0x80u, 0x40u, 0x20u, 0x10u, 0x08u, 0x04u, 0x02u, 0x01u},
+    {0x01u, 0x02u, 0x04u, 0x08u, 0x10u, 0x20u, 0x40u, 0x80u},
+    {0x40u, 0x10u, 0x04u, 0x01u, 0x80u, 0x20u, 0x08u, 0x02u},
+    {0x02u, 0x08u, 0x20u, 0x80u, 0x01u, 0x04u, 0x10u, 0x40u},
+    {0x20u, 0x04u, 0x80u, 0x01u, 0x40u, 0x02u, 0x10u, 0x08u},
+    {0x08u, 0x10u, 0x02u, 0x40u, 0x01u, 0x80u, 0x04u, 0x20u},
+    {0x10u, 0x80u, 0x08u, 0x01u, 0x20u, 0x02u, 0x40u, 0x04u},
+    {0x04u, 0x40u, 0x02u, 0x20u, 0x01u, 0x10u, 0x08u, 0x80u}
+};
+
+static void clear_canvas_random_pixels(void)
+{
+    unsigned remaining;
+    unsigned total;
+    unsigned byte_index;
+    uint8_t bit_index;
+    uint8_t value;
+    uint8_t mask;
+    const uint8_t *order;
+
+    total = CANVAS_STRIDE * GFX_CANVAS_HEIGHT;
+    byte_index = (unsigned)prng_next();
+    byte_index |= (unsigned)((unsigned)prng_next() << 8);
+    if (byte_index >= total)
+        byte_index -= total;
+
+    RIA.step0 = 0;
+    for (remaining = total; remaining != 0u; remaining--)
+    {
+        if ((remaining & 0x3Fu) == 0u && operation_cancel_requested())
+            break;
+        RIA.addr0 = CANVAS_DATA + byte_index;
+        value = RIA.rw0;
+        if (value != 0u)
+        {
+            order = clear_pixel_mask_order[prng_next() & 7u];
+            for (bit_index = 0; bit_index < 8u; bit_index++)
+            {
+                mask = order[bit_index];
+                if (!(value & mask))
+                    continue;
+                value &= (uint8_t)~mask;
+                RIA.rw0 = value;
+            }
+        }
+
+        byte_index += 73u;
+        if (byte_index >= total)
+            byte_index -= total;
+    }
+}
+*/

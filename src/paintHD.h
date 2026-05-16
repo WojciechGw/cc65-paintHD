@@ -293,6 +293,22 @@ static void primitive_cancel(void);
 static void draw_rect_tool_button(void);
 static void draw_ellipse_tool_button(void);
 static void exit_primitive_mode(void);
+static void draw_picker_status(void);
+static void draw_pointer(uint8_t type);
 static void draw_picker_handle_only(void);
+static void crosshair_hide(void);
+static void crosshair_show(void);
+static void line_anchor_hide_marker(void);
+static void line_anchor_show_marker(void);
+static void zoom_area_hide(void);
+static void zoom_area_show(void);
+static void zoom_cancel(void);
+static void zoom_redraw_block(int sx, int sy);
+static void zoom_apply_changes(void);
+// static void draw_canvas_text_char(char ch, int x, int y, uint8_t fg, uint8_t transparent);
+// static void draw_canvas_text(const char *text, int x, int y, uint8_t fg, uint8_t transparent);
+static void draw_canvas_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color);
+static void draw_canvas_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color);
+static int text_width(const char *text);
 
 #endif /* PAINT_HD_H */
