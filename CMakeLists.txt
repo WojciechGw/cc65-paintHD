@@ -18,6 +18,7 @@ add_subdirectory(tools)
 add_executable(paintHD)
 rp6502_asset(paintHD 0x10000 assets/paintHDwallpaper.bin)
 rp6502_asset(paintHD 0x1EC00 assets/fonticons.bin)
+rp6502_asset(paintHD paintHDsplash.bin assets/paintHDsplash.bin)
 rp6502_executable(paintHD DATA 0x200 RESET 0x200)
 target_sources(paintHD PRIVATE
     src/paintHDloader.c

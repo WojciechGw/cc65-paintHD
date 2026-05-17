@@ -3194,7 +3194,7 @@ static const char *picker_hover_text(int x, int y)
     if (x < 1 || x >= PICKER_WIDTH - 1 || y < 1 || y >= PICKER_HEIGHT - 1)
         return 0;
     if (x >= PICKER_HANDLE_X && x < PICKER_HANDLE_X + PICKER_BUTTON_SIZE)
-        return "move toolbar";
+        return "move[LMB]/fold[RMB] toolbar";
     if (x >= PICKER_SAVE_X && x < PICKER_SAVE_X + PICKER_BUTTON_SIZE)
     {
         snprintf(picker_save_hover, sizeof(picker_save_hover), "save %s",
@@ -3202,7 +3202,7 @@ static const char *picker_hover_text(int x, int y)
         return picker_save_hover;
     }
     if (x >= PICKER_SWAP_X && x < PICKER_SWAP_X + PICKER_BUTTON_SIZE)
-        return "pick color";
+        return "swap colors";
     if (x >= PICKER_ERASE_X && x < PICKER_ERASE_X + PICKER_BUTTON_SIZE)
         return selection_mode_active() ? "wipe selection" : "wipe all";
     if (x >= PICKER_INVERT_X && x < PICKER_INVERT_X + PICKER_BUTTON_SIZE)
@@ -3616,9 +3616,11 @@ static void toggle_mirror_mode(void)
 
 static const char *mirror_status_text(void)
 {
-    if (selection_active)
+    if (selection_mode_active()){
         return mirror_vertical ? "mirror selection V" : "mirror selection H";
-    return mirror_vertical ? "mirror canvas V" : "mirror canvas H";
+    } else {
+        return mirror_vertical ? "mirror canvas V" : "mirror canvas H";
+    }
 }
 
 static void perform_mirror_action(void)
@@ -5242,13 +5244,13 @@ int main(int argc, char *argv[]){
     f_mkdir("TMP");
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
-    #ifdef RELEASE
+    /* #ifdef RELEASE
     if(argc == 1) // if paintHD was run as standalone
     {
         PAUSE(200);
         clear_canvas_random_blocks8();
     }
-    #endif
+    #endif */
     snapshot_refresh_current();
     draw_picker();
     move_picker(((GFX_CANVAS_WIDTH - (PICKER_WIDTH))/2), GFX_CANVAS_HEIGHT - (PICKER_HEIGHT * 2));

@@ -78,8 +78,19 @@
 #define STATUSBAR_HEIGHT 8u
 #define STATUSBAR_START_AT_ROW (GFX_CANVAS_HEIGHT - STATUSBAR_HEIGHT)
 
-#define HID_PAGEUP 0x4Bu
-#define HID_PAGEDOWN 0x4Eu
+#define HID_ENTER      0x28u
+#define HID_ESCAPE     0x29u
+#define HID_BACKSPACE  0x2Au
+#define HID_SPACE      0x2Cu
+#define HID_MINUS      0x2Du
+#define HID_EQUAL      0x2Eu
+#define HID_LBRACKET   0x2Fu
+#define HID_RBRACKET   0x30u
+#define HID_LEFT_SHIFT 0xE1u
+#define HID_PAGEUP     0x4Bu
+#define HID_PAGEDOWN   0x4Eu
+
+#define FILENAME_MAX_LEN 20
 
 #define PAUSE_TICKS_START 200u
 
@@ -113,6 +124,7 @@ static int text_width(const char *text);
 static void draw_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color);
 static void draw_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color);
 static void draw_header_bar(void);
+static void draw_create_new_tile(int tile_x, int tile_y, int x2, int y2);
 static void draw_tile(unsigned index);
 static void draw_tiles(void);
 static int tile_hit(int x, int y);

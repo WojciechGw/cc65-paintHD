@@ -431,6 +431,22 @@ static uint8_t startup_load_page_cache(unsigned page)
     unsigned chunk;
     int fd;
 
+    /* always paint splash first */
+    fd = open("ROM:paintHDsplash.bin", O_RDONLY);
+    if (fd >= 0)
+    {
+        addr      = CANVAS_DATA;
+        remaining = (uint16_t)(GFX_CANVAS_HEIGHT * CANVAS_STRIDE);
+        while (remaining > 0u)
+        {
+            chunk = (remaining > 0x7FFFu) ? 0x7FFFu : (unsigned)remaining;
+            read_xram(addr, chunk, fd);
+            addr      += (uint16_t)chunk;
+            remaining -= (uint16_t)chunk;
+        }
+        close(fd);
+    }
+
     startup_page_cache_path(page, path);
     fd = open(path, O_RDONLY);
     if (fd < 0)
@@ -534,7 +550,7 @@ static int text_width(const char *text)
 
 static void draw_header_bar(void)
 {
-    static const char status[] = " Select the image you want to work on ";
+    static const char status[] = " Select the image you want to work with. ";
     char total_text[32];
     char page_text[32];
     char keys_text[16];
@@ -603,6 +619,24 @@ static void draw_header_bar(void)
     draw_text(page_text, page_x + 5, py, (int)GFX_CANVAS_WIDTH - 1, BLACK, WHITE);
 }
 
+static void draw_create_new_tile(int tile_x, int tile_y, int x2, int y2)
+{
+    unsigned tile_bx = (unsigned)tile_x >> 3;
+    int label_y = tile_y + TILE_LABEL_OFFSET_Y;
+    int x, y, bx;
+    for (y = tile_y; y <= y2; y++)
+    {
+        RIA.step0 = 1;
+        RIA.addr0 = CANVAS_DATA + (unsigned)y * CANVAS_STRIDE + tile_bx;
+        for (bx = 0; bx < (int)(STARTUP_TILE_WIDTH / 8u); bx++)
+            RIA.rw0 = 0x00u;
+    }
+    for (y = label_y; y < label_y + (int)STARTUP_LABEL_HEIGHT; y++)
+        for (x = tile_x + TILE_LABEL_OFFSET_X; x <= x2; x++)
+            raw_set_pixel(x, y, WHITE);
+    draw_text("*** Create a New Image ***", tile_x - 2 + 2, label_y + 1, x2 - 1, BLACK, WHITE);
+}
+
 static void draw_tiles(void)
 {
     unsigned i;
@@ -658,7 +692,9 @@ static void draw_tiles(void)
             for (y = label_y; y < label_y + (int)STARTUP_LABEL_HEIGHT; y++)
                 for (x = tile_x + TILE_LABEL_OFFSET_X; x <= x2; x++)
                     raw_set_pixel(x, y, WHITE);
-            draw_text("CREATE NEW IMAGE", tile_x - 2 + 2, label_y + 1, x2 - 1, BLACK, WHITE);
+            draw_text("*** Create a New Image ***", tile_x - 2 + 2, label_y + 1, x2 - 1, BLACK, WHITE);
+            if (startup_bmp_count == 0u)
+                break;
             continue;
         }
 
@@ -742,6 +778,7 @@ static void draw_tiles(void)
         }
         else
         {
+            /*
             for (y = tile_y; y <= y2; y++)
             {
                 pattern = ((y - tile_y) & 1) ? 0x55u : 0xAAu;
@@ -750,6 +787,7 @@ static void draw_tiles(void)
                 for (bx = 0; bx < (int)(STARTUP_TILE_WIDTH / 8u); bx++)
                     RIA.rw0 = pattern;
             }
+            */
         }
  
         if (file_index < startup_bmp_count)
@@ -792,6 +830,221 @@ static int tile_hit(int x, int y)
         return -1;
     index = startup_page_base() + row * STARTUP_TILE_COLS + col;
     return (int)index;
+}
+
+/* Create a 128x128 1bpp black BMP file. Returns 0 on success, -1 on error. */
+static int create_blank_bmp_128(const char *path)
+{
+    /* 62-byte header: File Header(14) + BITMAPINFOHEADER(40) + palette(8) */
+    static const uint8_t hdr[62] = {
+        'B','M',
+        0x3E,0x08,0x00,0x00,  /* file size = 2110 = 0x083E */
+        0x00,0x00,0x00,0x00,
+        0x3E,0x00,0x00,0x00,  /* pixel data offset = 62 */
+        0x28,0x00,0x00,0x00,  /* BITMAPINFOHEADER size = 40 */
+        0x80,0x00,0x00,0x00,  /* width  = 128 */
+        0x80,0xFF,0xFF,0xFF,  /* height = -128 (top-down) */
+        0x01,0x00,            /* color planes = 1 */
+        0x01,0x00,            /* bits per pixel = 1 */
+        0x00,0x00,0x00,0x00,  /* compression = BI_RGB */
+        0x00,0x08,0x00,0x00,  /* image size = 2048 = 0x0800 */
+        0x13,0x0B,0x00,0x00,
+        0x13,0x0B,0x00,0x00,
+        0x02,0x00,0x00,0x00,
+        0x00,0x00,0x00,0x00,
+        0x00,0x00,0x00,0x00,  /* index 0 = black */
+        0xFF,0xFF,0xFF,0x00   /* index 1 = white */
+    };
+    static const uint8_t zero[16] = {0};
+    int fd;
+    int row;
+
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0)
+        return -1;
+    if (write(fd, hdr, sizeof(hdr)) != (int)sizeof(hdr))
+    {
+        close(fd);
+        return -1;
+    }
+    /* 128 rows × 16 bytes/row = 2048 bytes of zeros */
+    for (row = 0; row < 128; row++)
+    {
+        if (write(fd, zero, sizeof(zero)) != (int)sizeof(zero))
+        {
+            close(fd);
+            return -1;
+        }
+    }
+    close(fd);
+    return 0;
+}
+
+/* Draw cursor at position len (blank out previous cursor pos first) */
+static void ask_filename_draw_cursor(int tile_x, int py, int len)
+{
+    draw_text_char('_', tile_x + 2 + len * 6, py, WHITE, BLACK);
+}
+
+/* Erase cursor at position len (overwrite with BLACK) */
+static void ask_filename_erase_cursor(int tile_x, int py, int len)
+{
+    draw_text_char(' ', tile_x + 2 + len * 6, py, BLACK, BLACK);
+}
+
+/* Initial full draw: clear row, draw whole buf, draw cursor */
+static void ask_filename_draw_all(int tile_x, int py, int x2,
+                                  const char *buf, int len)
+{
+    int x, y;
+    for (y = py - 1; y <= py + 8; y++)
+        for (x = tile_x; x <= x2; x++)
+            raw_set_pixel(x, y, BLACK);
+    draw_text(buf, tile_x + 2, py, x2 - 1, WHITE, BLACK);
+    ask_filename_draw_cursor(tile_x, py, len);
+}
+
+static uint8_t ask_filename(char *out, int max_len,
+                             int tile_x, int tile_y, int x2, int y2)
+{
+    static const char hid_to_digit[10] = {
+        '1','2','3','4','5','6','7','8','9','0'
+    };
+    int len = 0;
+    int x, y;
+    uint8_t hid;
+    uint8_t prev_key;
+    uint8_t cur_key;
+    uint8_t shifted;
+    char ch;
+    int py_prompt = tile_y + 18;
+    int py_input  = tile_y + 32;
+    int py_hint   = tile_y + 50;
+    uint32_t blink_tick;
+    uint8_t  cursor_on;
+    uint32_t now;
+
+    out[0] = '\0';
+
+    /* clear tile */
+    for (y = tile_y + 12u; y <= y2; y++)
+    {
+        RIA.step0 = 1;
+        RIA.addr0 = CANVAS_DATA + (unsigned)y * CANVAS_STRIDE + ((unsigned)tile_x >> 3);
+        for (x = 0; x < (int)(STARTUP_TILE_WIDTH / 8u); x++)
+            RIA.rw0 = 0x00u;
+    }
+
+    draw_text("Enter BMP filename :", tile_x + 4, py_prompt, x2 - 1, WHITE, BLACK);
+    draw_text("Hints:", tile_x + 4, py_hint + 8, x2 - 1, WHITE, BLACK);
+    draw_text("max. 20 characters", tile_x + 8, py_hint + 20, x2 - 1, WHITE, BLACK);
+    draw_text("a-z A-Z 0-9 _ - + = [ ]", tile_x + 8, py_hint + 30, x2 - 1, WHITE, BLACK);
+    draw_text("ESC cancel", tile_x + 8, py_hint + 40, x2 - 1, WHITE, BLACK);
+    draw_text("ENTER confirm", tile_x + 8, py_hint + 50, x2 - 1, WHITE, BLACK);
+    ask_filename_draw_all(tile_x + 8, py_input, x2, out, len);
+
+    prev_key   = 0u;
+    blink_tick = clock();
+    cursor_on  = 1u;
+    while (1)
+    {
+        /* blink cursor every 250 ms when idle */
+        now = clock();
+        if (now - blink_tick >= 25u)
+        {
+            blink_tick = now;
+            cursor_on ^= 1u;
+            if (cursor_on)
+                ask_filename_draw_cursor(tile_x + 8, py_input, len);
+            else
+                ask_filename_erase_cursor(tile_x + 8, py_input, len);
+        }
+
+        /* scan a-z: HID 0x04..0x1D */
+        cur_key = 0u;
+        for (hid = 0x04u; hid <= 0x1Du; hid++)
+        {
+            if (key_pressed(hid)) { cur_key = hid; break; }
+        }
+        /* scan 1-9,0: HID 0x1E..0x27 */
+        if (cur_key == 0u)
+        {
+            for (hid = 0x1Eu; hid <= 0x27u; hid++)
+            {
+                if (key_pressed(hid)) { cur_key = hid; break; }
+            }
+        }
+        /* space and special chars */
+        if (cur_key == 0u && key_pressed(HID_SPACE))    cur_key = HID_SPACE;
+        if (cur_key == 0u && key_pressed(HID_MINUS))    cur_key = HID_MINUS;
+        if (cur_key == 0u && key_pressed(HID_EQUAL))    cur_key = HID_EQUAL;
+        if (cur_key == 0u && key_pressed(HID_LBRACKET)) cur_key = HID_LBRACKET;
+        if (cur_key == 0u && key_pressed(HID_RBRACKET)) cur_key = HID_RBRACKET;
+        /* backspace */
+        if (cur_key == 0u && key_pressed(HID_BACKSPACE))
+            cur_key = HID_BACKSPACE;
+        /* enter */
+        if (cur_key == 0u && key_pressed(HID_ENTER))
+            cur_key = HID_ENTER;
+        /* escape */
+        if (cur_key == 0u && key_pressed(HID_ESCAPE))
+            cur_key = HID_ESCAPE;
+
+        shifted = key_pressed(HID_LEFT_SHIFT) ? 1u : 0u;
+
+        if (cur_key != prev_key && cur_key != 0u)
+        {
+            /* key event — ensure cursor visible and reset blink phase */
+            blink_tick = clock();
+            cursor_on  = 1u;
+            ask_filename_draw_cursor(tile_x + 8, py_input, len);
+            if (cur_key == HID_ESCAPE)
+                return 0u;
+            if (cur_key == HID_ENTER)
+            {
+                if (len > 0)
+                    return 1u;
+            }
+            else if (cur_key == HID_BACKSPACE)
+            {
+                if (len > 0)
+                {
+                    ask_filename_erase_cursor(tile_x + 8, py_input, len);
+                    len--;
+                    out[len] = '\0';
+                    draw_text_char(' ', tile_x + 8 + len * 6, py_input, BLACK, BLACK);
+                    ask_filename_draw_cursor(tile_x + 8, py_input, len);
+                }
+            }
+            else
+            {
+                if (len < max_len)
+                {
+                    if (cur_key >= 0x04u && cur_key <= 0x1Du)
+                        ch = shifted ? (char)('A' + (cur_key - 0x04u))
+                                     : (char)('a' + (cur_key - 0x04u));
+                    else if (cur_key >= 0x1Eu && cur_key <= 0x27u)
+                        ch = hid_to_digit[cur_key - 0x1Eu];
+                    else if (cur_key == HID_MINUS)
+                        ch = shifted ? '_' : '-';
+                    else if (cur_key == HID_EQUAL)
+                        ch = '=';
+                    else if (cur_key == HID_LBRACKET)
+                        ch = '[';
+                    else if (cur_key == HID_RBRACKET)
+                        ch = ']';
+                    else
+                        ch = ' ';
+                    ask_filename_erase_cursor(tile_x + 8, py_input, len);
+                    out[len++] = ch;
+                    out[len]   = '\0';
+                    draw_text_char(ch, tile_x + 8 + (len - 1) * 6, py_input, WHITE, BLACK);
+                    ask_filename_draw_cursor(tile_x + 8, py_input, len);
+                }
+            }
+        }
+        prev_key = cur_key;
+    }
 }
 
 static int wait_for_selection(void)
@@ -906,28 +1159,74 @@ int main(int argc, char *argv[])
     startup_collect_bmps();
 
     {
-        char new_arg[] = "paintHD_new.bmp";
+        char new_name[FILENAME_MAX_LEN + 5];
         unsigned file_index;
+        int tx  = (int)STARTUP_LEFT_MARGIN;
+        int ty  = (int)STARTUP_TOP_MARGIN;
+        int tx2 = tx + (int)STARTUP_TILE_WIDTH - 1;
+        int ty2 = ty + (int)STARTUP_TILE_HEIGHT - 1;
 
         startup_clear_page_cache();
         draw_tiles();
         draw_pointer(POINTER_arrow);
         mouse_init();
-        selected = wait_for_selection();
-        VIA.ier = 0x40; /* disable T1 interrupt (mouse) */
-        if (selected == 0)
+
+        while (1)
         {
-            ria_execl("paintHDeditor.rp6502", new_arg, NULL);
-            return 0;
-        }
-        file_index = (unsigned)selected - 1u;
-        if (file_index < startup_bmp_count)
-        {
-            #ifdef DEBUG
-            printf("%s\n", startup_basename(startup_bmp_names[file_index]));
-            #endif
-            ria_execl("paintHDeditor.rp6502", startup_basename(startup_bmp_names[file_index]), NULL);
-            return 0;
+            selected = wait_for_selection();
+            if (selected == 0)
+            {
+                for (;;)
+                {
+                    /* ask for filename inside the CREATE NEW IMAGE tile */
+                    if (!ask_filename(new_name, FILENAME_MAX_LEN, tx, ty, tx2, ty2))
+                    {
+                        /* ESC — redraw tiles and let user pick again */
+                        draw_tiles();
+                        break;
+                    }
+                    strcat(new_name, ".bmp");
+                    {
+                        int fd;
+                        int err_y = ty + 50;
+                        /* check if file already exists */
+                        fd = open(new_name, O_RDONLY);
+                        if (fd >= 0)
+                        {
+                            close(fd);
+                            /* redraw tile 0 with label, show error, then retry */
+                            draw_create_new_tile(tx, ty, tx2, ty2);
+                            printf("\x07\x07\x07");
+                            draw_text(" [!] FILE EXISTS ", tx + 22, err_y, tx2 - 1, BLACK, WHITE);
+                            PAUSE(150);
+                            continue;
+                        }
+                        /* create blank 128x128 BMP */
+                        if (create_blank_bmp_128(new_name) < 0)
+                        {
+                            draw_create_new_tile(tx, ty, tx2, ty2);
+                            printf("\x07\x07\x07\x07\x07");
+                            draw_text(" [!] CREATE ERROR", tx + 22, err_y, tx2 - 1, BLACK, WHITE);
+                            PAUSE(150);
+                            continue;
+                        }
+                    }
+                    VIA.ier = 0x40;
+                    ria_execl("paintHDeditor.rp6502", new_name, NULL);
+                    return 0;
+                }
+                continue;
+            }
+            file_index = (unsigned)selected - 1u;
+            if (file_index < startup_bmp_count)
+            {
+                #ifdef DEBUG
+                printf("%s\n", startup_basename(startup_bmp_names[file_index]));
+                #endif
+                VIA.ier = 0x40;
+                ria_execl("paintHDeditor.rp6502", startup_basename(startup_bmp_names[file_index]), NULL);
+                return 0;
+            }
         }
     }
 }
