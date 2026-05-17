@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "paintHD.h"
+#include "paintHDeditor.h"
 
 #define RELEASE
 
@@ -89,7 +89,6 @@ static clock_t picker_status_deadline;
 static clock_t size_click_deadline;
 static clock_t mirror_click_deadline;
 static clock_t ctrl_hover_deadline;
-static uint8_t startup_splash_pending;
 static uint8_t help_pending;
 static uint8_t picker_collapsed;
 static int g_argc;
@@ -1837,8 +1836,8 @@ static void zoom_cancel(void)
 static void zoom_area_move(int x, int y)
 {
     int nx, ny;
-    nx = x - ZOOM_AREA / 2;
-    ny = y - ZOOM_AREA / 2;
+    nx = x;
+    ny = y;
     if (nx < 0) nx = 0;
     if (nx > (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA)) nx = (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA);
     nx = (nx / 8) * 8;  /* align to byte boundary so pixel save/restore is exact */
@@ -3173,7 +3172,7 @@ static void set_canvas_dirty(bool dirty)
 
 static uint8_t canvas_input_locked(void)
 {
-    return startup_splash_pending != 0;
+    return 0;
 }
 
 static const char *picker_hover_text(int x, int y)
@@ -3746,7 +3745,7 @@ static void save_canvas_bmp_force(const char *path)
     busy_end();
 }
 
-static void startup_after_click(void)
+static void init_canvas(void)
 {
     static const char save_name[] = "paintHD_save.bmp";
     static const char new_name[]  = "paintHD_new.bmp";
@@ -4356,13 +4355,6 @@ static void left_press(int x, int y)
         busy_begin();
         LoadBMP("paintHD_tmp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
         busy_end();
-        return;
-    }
-
-    if (startup_splash_pending)
-    {
-        startup_splash_pending = 0;
-        startup_after_click();
         return;
     }
 
@@ -5201,7 +5193,6 @@ int main(int argc, char *argv[]){
     picker_status[0] = '\0';
     picker_hover_status = 0;
     picker_status_deadline = 0;
-    startup_splash_pending = 0;
     size_click_deadline = 0;
     size_click_pending = 0;
     mirror_click_deadline = 0;
@@ -5252,7 +5243,7 @@ int main(int argc, char *argv[]){
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     #ifdef RELEASE
-    if(argc == 1)
+    if(argc == 1) // if paintHD was run as standalone
     {
         PAUSE(200);
         clear_canvas_random_blocks8();
@@ -5263,8 +5254,7 @@ int main(int argc, char *argv[]){
     move_picker(((GFX_CANVAS_WIDTH - (PICKER_WIDTH))/2), GFX_CANVAS_HEIGHT - (PICKER_HEIGHT * 2));
     draw_pointer(POINTER_arrow);
 
-    LoadBMP("ROM:paintHDhelp.bmp", CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8);
-    startup_splash_pending = 1u;
+    init_canvas();
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, PICKER_STRUCT, GFX_PLANE_1);
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, POINTER_STRUCT, GFX_PLANE_2);
@@ -5333,6 +5323,8 @@ int main(int argc, char *argv[]){
         {
             prev_escape = 0;
         }
+        if (!zoom_area_active)
+        {
         if (key_pressed(HID_F1))
         {
             if (!zoom_view_active && !prev_f1)
@@ -5441,8 +5433,10 @@ int main(int argc, char *argv[]){
             if (!prev_ctrl_q)
             {
                 char arg[] = "RET";
+                VIA.ier = 0x40; /* disable T1 interrupt (mouse) */
                 save_canvas_bmp_force("paintHD_save.bmp");
-                ria_execl("paintHDloader.rp6502", arg, NULL);
+                if(argc > 1) // if paintHD wasn't run as standalone
+                    ria_execl("paintHD.rp6502", arg, NULL);
                 return 0;
             }
         }
@@ -5536,6 +5530,7 @@ int main(int argc, char *argv[]){
         {
             prev_ctrl_shift_alt_t = 0;
         }
+        } /* !zoom_area_active */
         mouse();
     }
 }

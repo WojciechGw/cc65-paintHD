@@ -34,14 +34,6 @@ static unsigned startup_page;
 static f_stat_t startup_dirent;
 static uint8_t startup_bmp_hdr[34];
 
-static uint16_t prng_state = 1u;
-
-static uint8_t prng_next(void)
-{
-    prng_state = prng_state * 25173u + 13849u;
-    return (uint8_t)(prng_state >> 8);
-}
-
 unsigned char mouse_irq_fn(void)
 {
     static int16_t raw_x;
@@ -108,19 +100,6 @@ static void mouse_init(void)
 
 }
 
-/*
-static void draw_pointer(uint8_t cursor)
-{
-    unsigned i;
-
-    (void)cursor;
-    RIA.addr0 = POINTER_DATA;
-    RIA.step0 = 1;
-    for (i = 0u; i < sizeof(arrow); i++)
-        RIA.rw0 = arrow[i];
-}
-*/
-
 static void draw_pointer(uint8_t type)
 {
     switch(type){
@@ -135,6 +114,7 @@ static void draw_pointer(uint8_t type)
     }
 }
 
+/*
 static void clear_canvas_random_blocks8(void)
 {
     unsigned cleared;
@@ -176,6 +156,7 @@ static void clear_canvas_random_blocks8(void)
             state ^= 0x1C80u;
     }
 }
+*/
 
 static void raw_set_pixel(int x, int y, uint8_t color)
 {
@@ -410,6 +391,16 @@ static unsigned startup_page_base(void)
     return startup_page * STARTUP_TILE_COUNT;
 }
 
+/* Page 0 holds STARTUP_TILE_COUNT-1 files (tile 0 = CREATE NEW IMAGE).
+   Subsequent pages hold STARTUP_TILE_COUNT files each. */
+static unsigned startup_page_count(void)
+{
+    unsigned slots0 = STARTUP_TILE_COUNT - 1u;
+    if (startup_bmp_count <= slots0)
+        return 1u;
+    return 1u + (startup_bmp_count - slots0 + STARTUP_TILE_COUNT - 1u) / STARTUP_TILE_COUNT;
+}
+
 static void startup_page_cache_path(unsigned page, char *out)
 {
     memcpy(out, "./TMP/loader_p000.bin", 20u);
@@ -424,7 +415,7 @@ static void startup_clear_page_cache(void)
     unsigned page_count;
     char path[STARTUP_CACHE_PATH_LEN];
 
-    page_count = (startup_bmp_count + STARTUP_TILE_COUNT - 1u) / STARTUP_TILE_COUNT;
+    page_count = startup_page_count();
     for (page = 0u; page < page_count; page++)
     {
         startup_page_cache_path(page, path);
@@ -543,7 +534,7 @@ static int text_width(const char *text)
 
 static void draw_header_bar(void)
 {
-    static const char loader_name[] = " PaintHD image loader ";
+    static const char loader_name[] = " Select the image you want to work on ";
     char total_text[32];
     char page_text[32];
     char keys_text[16];
@@ -557,9 +548,9 @@ static void draw_header_bar(void)
     int page_x;
     int keys_x;
 
-    page_count = (startup_bmp_count + STARTUP_TILE_COUNT - 1u) / STARTUP_TILE_COUNT;
+    page_count = startup_page_count();
 
-    for (row = 0u; row < STARTUP_TOP_MARGIN; row++)
+    for (row = STATUSBAR_START_AT_ROW; row < GFX_CANVAS_HEIGHT; row++)
     {
         RIA.step0 = 1;
         RIA.addr0 = CANVAS_DATA + row * CANVAS_STRIDE;
@@ -567,7 +558,7 @@ static void draw_header_bar(void)
             RIA.rw0 = 0u;
     }
 
-    py = (int)((STARTUP_TOP_MARGIN - 8u) / 2u);
+    py = (int)(STATUSBAR_START_AT_ROW);
 
     draw_text(loader_name, 0, py, (int)GFX_CANVAS_WIDTH - 1, BLACK, WHITE);
 
@@ -647,12 +638,31 @@ static void draw_tiles(void)
     page_base = startup_page_base();
     for (i = 0u; i < STARTUP_TILE_COUNT; i++)
     {
-        file_index = page_base + i;
-        tile_x = (int)((i % STARTUP_TILE_COLS) * STARTUP_TILE_WIDTH);
-        tile_y = (int)STARTUP_TOP_MARGIN + (int)((i / STARTUP_TILE_COLS) * STARTUP_TILE_HEIGHT);
+        tile_x = (int)(STARTUP_LEFT_MARGIN + (i % STARTUP_TILE_COLS) * (STARTUP_TILE_WIDTH + STARTUP_TILE_SPACING_X));
+        tile_y = (int)(STARTUP_TOP_MARGIN + (i / STARTUP_TILE_COLS) * (STARTUP_TILE_HEIGHT + STARTUP_TILE_SPACING_Y));
         tile_bx = (unsigned)tile_x >> 3;
         x2 = tile_x + (int)STARTUP_TILE_WIDTH - 1;
         y2 = tile_y + (int)STARTUP_TILE_HEIGHT - 1;
+
+        if (page_base == 0u && i == 0u)
+        {
+            /* CREATE NEW IMAGE tile — draw black */
+            for (y = tile_y; y <= y2; y++)
+            {
+                RIA.step0 = 1;
+                RIA.addr0 = CANVAS_DATA + (unsigned)y * CANVAS_STRIDE + tile_bx;
+                for (bx = 0; bx < (int)(STARTUP_TILE_WIDTH / 8u); bx++)
+                    RIA.rw0 = 0x00u;
+            }
+            label_y = tile_y - 2;
+            for (y = label_y; y < label_y + (int)STARTUP_LABEL_HEIGHT; y++)
+                for (x = tile_x - 2; x <= x2; x++)
+                    raw_set_pixel(x, y, WHITE);
+            draw_text("CREATE NEW IMAGE", tile_x - 2 + 2, label_y + 1, x2 - 1, BLACK, WHITE);
+            continue;
+        }
+
+        file_index = page_base + i - 1u;
 
         if (file_index < startup_bmp_count)
         {
@@ -748,13 +758,13 @@ static void draw_tiles(void)
             label_w = 4 + (int)(strlen(label) * 6u);
             if (label_w > (int)STARTUP_TILE_WIDTH)
                 label_w = (int)STARTUP_TILE_WIDTH;
-            label_y = tile_y + (int)STARTUP_TILE_HEIGHT - (int)STARTUP_LABEL_HEIGHT;
-            for (y = label_y; y <= y2; y++)
+            label_y = tile_y - 2;
+            for (y = label_y; y < label_y + (int)STARTUP_LABEL_HEIGHT; y++)
             {
-                for (x = tile_x; x < tile_x + label_w; x++)
-                    raw_set_pixel(x, y, BLACK);
+                for (x = tile_x - 2; x < tile_x - 2 + label_w; x++)
+                    raw_set_pixel(x, y, WHITE);
             }
-            draw_text(label, tile_x + 2, label_y + 1, tile_x + label_w - 3, WHITE, BLACK);
+            draw_text(label, tile_x - 2 + 2, label_y + 1, tile_x - 2 + label_w - 3, BLACK, WHITE);
         }
     }
     startup_save_page_cache(startup_page);
@@ -768,14 +778,19 @@ static int tile_hit(int x, int y)
 
     if (x < 0 || x >= (int)GFX_CANVAS_WIDTH || y < 0 || y >= (int)GFX_CANVAS_HEIGHT)
         return -1;
-    if (y < (int)STARTUP_TOP_MARGIN)
+    if (x < (int)STARTUP_LEFT_MARGIN || y < (int)STARTUP_TOP_MARGIN)
         return -1;
 
-    col = (unsigned)x / STARTUP_TILE_WIDTH;
-    row = ((unsigned)y - STARTUP_TOP_MARGIN) / STARTUP_TILE_HEIGHT;
-    index = startup_page_base() + row * STARTUP_TILE_COLS + col;
-    if (index >= startup_page_base() + STARTUP_TILE_COUNT)
+    col = ((unsigned)x - STARTUP_LEFT_MARGIN) / (STARTUP_TILE_WIDTH + STARTUP_TILE_SPACING_X);
+    row = ((unsigned)y - STARTUP_TOP_MARGIN) / (STARTUP_TILE_HEIGHT + STARTUP_TILE_SPACING_Y);
+    if (col >= STARTUP_TILE_COLS || row >= STARTUP_TILE_ROWS)
         return -1;
+    /* reject clicks in the spacing gap */
+    if (((unsigned)x - STARTUP_LEFT_MARGIN) % (STARTUP_TILE_WIDTH + STARTUP_TILE_SPACING_X) >= STARTUP_TILE_WIDTH)
+        return -1;
+    if (((unsigned)y - STARTUP_TOP_MARGIN) % (STARTUP_TILE_HEIGHT + STARTUP_TILE_SPACING_Y) >= STARTUP_TILE_HEIGHT)
+        return -1;
+    index = startup_page_base() + row * STARTUP_TILE_COLS + col;
     return (int)index;
 }
 
@@ -793,7 +808,7 @@ static int wait_for_selection(void)
     prev_buttons = 0u;
     prev_pageup = 0u;
     prev_pagedown = 0u;
-    page_count = (startup_bmp_count + STARTUP_TILE_COUNT - 1u) / STARTUP_TILE_COUNT;
+    page_count = startup_page_count();
     while (1)
     {
         pageup_now = key_pressed(HID_PAGEUP) ? 1u : 0u;
@@ -817,7 +832,7 @@ static int wait_for_selection(void)
         if ((buttons & 1u) != 0u && (prev_buttons & 1u) == 0u)
         {
             index = tile_hit(mouse_pos_x, mouse_pos_y);
-            if (index >= 0)
+            if (index == 0 || (index > 0 && (unsigned)index - 1u < startup_bmp_count))
                 return index;
         }
         prev_buttons = buttons;
@@ -876,11 +891,13 @@ int main(int argc, char *argv[])
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     xreg_ria_keyboard(KEYBOARD_INPUT);
+    /*
     if(argc == 1)
     {
         PAUSE(PAUSE_TICKS_START);
         clear_canvas_random_blocks8();
     }
+    */
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, POINTER_STRUCT, GFX_PLANE_2);
     mouse_pos_x = (int16_t)(GFX_CANVAS_WIDTH / 2u);
     mouse_pos_y = (int16_t)(GFX_CANVAS_HEIGHT / 2u);
@@ -888,25 +905,30 @@ int main(int argc, char *argv[])
     xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, y_pos_px, mouse_pos_y);
     draw_pointer(POINTER_hourglass);
     startup_collect_bmps();
-    if (startup_bmp_count == 0u)
+
     {
-        printf("\nThere are no .BMP file(s)\n\n");
-        return 0;
-    } else {
+        char new_arg[] = "paintHD_new.bmp";
+        unsigned file_index;
+
         startup_clear_page_cache();
         draw_tiles();
         draw_pointer(POINTER_arrow);
         mouse_init();
         selected = wait_for_selection();
-        if (selected >= 0 && (unsigned)selected < startup_bmp_count){
-            #ifdef DEBUG
-            printf("%s\n", startup_basename(startup_bmp_names[(unsigned)selected]));
-            #endif
-            ria_execl("paintHD.rp6502", startup_basename(startup_bmp_names[(unsigned)selected]), NULL);
-        } else if (selected >= 0) {
-            char arg[] = "paintHD_new.bmp";
-            ria_execl("paintHD.rp6502", arg, NULL);
+        VIA.ier = 0x40; /* disable T1 interrupt (mouse) */
+        if (selected == 0)
+        {
+            ria_execl("paintHDeditor.rp6502", new_arg, NULL);
+            return 0;
         }
-        return 0;
+        file_index = (unsigned)selected - 1u;
+        if (file_index < startup_bmp_count)
+        {
+            #ifdef DEBUG
+            printf("%s\n", startup_basename(startup_bmp_names[file_index]));
+            #endif
+            ria_execl("paintHDeditor.rp6502", startup_basename(startup_bmp_names[file_index]), NULL);
+            return 0;
+        }
     }
 }
