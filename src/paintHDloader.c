@@ -534,7 +534,7 @@ static int text_width(const char *text)
 
 static void draw_header_bar(void)
 {
-    static const char loader_name[] = " Select the image you want to work on ";
+    static const char status[] = " Select the image you want to work on ";
     char total_text[32];
     char page_text[32];
     char keys_text[16];
@@ -560,10 +560,10 @@ static void draw_header_bar(void)
 
     py = (int)(STATUSBAR_START_AT_ROW);
 
-    draw_text(loader_name, 0, py, (int)GFX_CANVAS_WIDTH - 1, BLACK, WHITE);
+    draw_text(status, 0, py, (int)GFX_CANVAS_WIDTH - 1, BLACK, WHITE);
 
     sprintf(total_text, " total images : %u ", startup_bmp_count);
-    total_x = ((int)GFX_CANVAS_WIDTH - text_width(total_text)) / 2;
+    total_x = text_width(status) + 8u;
     if (total_x < 0)
         total_x = 0;
     draw_text(total_text, total_x, py, (int)GFX_CANVAS_WIDTH - 1, WHITE, BLACK);
@@ -654,9 +654,9 @@ static void draw_tiles(void)
                 for (bx = 0; bx < (int)(STARTUP_TILE_WIDTH / 8u); bx++)
                     RIA.rw0 = 0x00u;
             }
-            label_y = tile_y - 2;
+            label_y = tile_y + TILE_LABEL_OFFSET_Y;
             for (y = label_y; y < label_y + (int)STARTUP_LABEL_HEIGHT; y++)
-                for (x = tile_x - 2; x <= x2; x++)
+                for (x = tile_x + TILE_LABEL_OFFSET_X; x <= x2; x++)
                     raw_set_pixel(x, y, WHITE);
             draw_text("CREATE NEW IMAGE", tile_x - 2 + 2, label_y + 1, x2 - 1, BLACK, WHITE);
             continue;
@@ -751,20 +751,20 @@ static void draw_tiles(void)
                     RIA.rw0 = pattern;
             }
         }
-
+ 
         if (file_index < startup_bmp_count)
         {
             label = startup_basename(startup_bmp_names[file_index]);
             label_w = 4 + (int)(strlen(label) * 6u);
             if (label_w > (int)STARTUP_TILE_WIDTH)
                 label_w = (int)STARTUP_TILE_WIDTH;
-            label_y = tile_y - 2;
+            label_y = tile_y - TILE_LABEL_OFFSET_Y;
             for (y = label_y; y < label_y + (int)STARTUP_LABEL_HEIGHT; y++)
             {
-                for (x = tile_x - 2; x < tile_x - 2 + label_w; x++)
+                for (x = tile_x + TILE_LABEL_OFFSET_X; x < tile_x + TILE_LABEL_OFFSET_X + label_w; x++)
                     raw_set_pixel(x, y, WHITE);
             }
-            draw_text(label, tile_x - 2 + 2, label_y + 1, tile_x - 2 + label_w - 3, BLACK, WHITE);
+            draw_text(label, tile_x + TILE_LABEL_OFFSET_X + 2, label_y + 1, tile_x + TILE_LABEL_OFFSET_X + label_w - 3, BLACK, WHITE);
         }
     }
     startup_save_page_cache(startup_page);
@@ -891,14 +891,13 @@ int main(int argc, char *argv[])
 
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp1, CANVAS_STRUCT, GFX_PLANE_0);
     xreg_ria_keyboard(KEYBOARD_INPUT);
-    /*
     if(argc == 1)
     {
         PAUSE(PAUSE_TICKS_START);
-        clear_canvas_random_blocks8();
+        // clear_canvas_random_blocks8();
     }
-    */
     xreg_vga_mode(GFX_MODE_BITMAP, GFX_BITMAP_bpp8, POINTER_STRUCT, GFX_PLANE_2);
+    printf("\x1b[2J\x1b[38;1m");
     mouse_pos_x = (int16_t)(GFX_CANVAS_WIDTH / 2u);
     mouse_pos_y = (int16_t)(GFX_CANVAS_HEIGHT / 2u);
     xram0_struct_set(POINTER_STRUCT, vga_mode3_config_t, x_pos_px, mouse_pos_x);
