@@ -1,5 +1,5 @@
 /*
- * PaintHD
+ * PaintHD > Editor
  * Copyright (c) 2026 WojciechGw
  * based on paint.c example
  * Copyright (c) 2025 Rumbledethumps
@@ -136,13 +136,14 @@
     (RIA.addr0 = KEYBOARD_INPUT + ((code) >> 3), RIA.step0 = 0, \
      RIA.rw0 & (1 << ((code) & 7)))
 
-#define BRUSH_MIN 1
-#define BRUSH_MAX 64
+#define BRUSH_MIN 1u
+#define BRUSH_MAX 64u
+#define BRUSH_MID (BRUSH_MAX / 2u)
 
-#define TOOL_BRUSH  0
-#define TOOL_SELECT 1
-#define TOOL_RECT   2
-#define TOOL_ELLIPSE 3
+#define TOOL_BRUSH  0u
+#define TOOL_SELECT 1u
+#define TOOL_RECT   2u
+#define TOOL_ELLIPSE 3u
 
 #define DRAW_BUTTON_NONE  0u
 #define DRAW_BUTTON_LEFT  1u
@@ -159,27 +160,19 @@
 #define PICKER_BG_COLOR 245u
 #define PICKER_SAVE_DISABLED_COLOR 245u
 
-#define SHAPE_COUNT  6
-#define SHAPE_SQUARE 0
-#define SHAPE_CIRCLE 1
-#define SHAPE_VERT   2
-#define SHAPE_DIAG   3
-#define SHAPE_SPRAY  4
-#define SHAPE_FILL   5
+#define FILL_QUEUE_SIZE 512u // <    - 800 <- 2048
 
-#define FILL_QUEUE_SIZE 512 // <    - 800 <- 2048
+#define GFX_CANVAS_CONSOLE 0u
+#define GFX_CANVAS_320x240 1u
+#define GFX_CANVAS_320x180 2u
+#define GFX_CANVAS_640x480 3u
+#define GFX_CANVAS_640x360 4u
 
-#define GFX_CANVAS_CONSOLE 0
-#define GFX_CANVAS_320x240 1
-#define GFX_CANVAS_320x180 2
-#define GFX_CANVAS_640x480 3
-#define GFX_CANVAS_640x360 4
-
-#define GFX_MODE_CONSOLE   0
-#define GFX_MODE_CHARACTER 1
-#define GFX_MODE_TILE      2
-#define GFX_MODE_BITMAP    3
-#define GFX_MODE_SPRITE    4
+#define GFX_MODE_CONSOLE   0u
+#define GFX_MODE_CHARACTER 1u
+#define GFX_MODE_TILE      2u
+#define GFX_MODE_BITMAP    3u
+#define GFX_MODE_SPRITE    4u
 
 #define GFX_MODE_SPRITE_NORMAL 0b00000000
 #define GFX_MODE_SPRITE_AFFINE 0b00000010
@@ -197,13 +190,13 @@
 #define GFX_CHARACTER_bpp8         0b00000011
 #define GFX_CHARACTER_bpp16        0b00000100
 
-#define GFX_FONT_CUSTOM 0xF000        // custom font
-#define GFX_CHARACTER_FONT_PTR 0xFFFF // system font
-#define GFX_CHARACTER_PAL_PTR  0xFFFF
+#define GFX_FONT_CUSTOM 0xF000u        // custom font
+#define GFX_CHARACTER_FONT_PTR 0xFFFFu // system font
+#define GFX_CHARACTER_PAL_PTR  0xFFFFu
 
-#define GFX_PLANE_0 0
-#define GFX_PLANE_1 1
-#define GFX_PLANE_2 2
+#define GFX_PLANE_0 0u
+#define GFX_PLANE_1 1u
+#define GFX_PLANE_2 2u
 
 #define GFX_CHARACTER_FONTSIZE8x16 0b00001000
 #define GFX_CHARACTER_FONTSIZE8x8  0b00000000
@@ -211,11 +204,6 @@
 #define GFX_CANVAS_TYPE GFX_CANVAS_640x480
 #define GFX_CANVAS_WIDTH  640u
 #define GFX_CANVAS_HEIGHT 480u
-/*
-#define GFX_CANVAS_COLUMNS (GFX_CANVAS_WIDTH / 8u)
-#define GFX_CANVAS_ROWS (GFX_CANVAS_HEIGHT / 8u)
-#define GFX_CANVAS_BYTES_PER_CHARACTER 6u
-*/
 
 #define GFX_CANVAS_TYPE GFX_CANVAS_640x480
 #define WHITE 1
@@ -238,8 +226,6 @@ static void perform_mirror_action(void);
 static void set_canvas_dirty(bool dirty);
 static void canvas_modify_begin(void);
 static void canvas_modify_end(void);
-static void clear_canvas_random_pixels(void);
-static void clear_canvas_random_blocks8(void);
 static void operation_cancel_begin(void);
 static uint8_t operation_cancel_requested(void);
 static uint8_t operation_was_cancelled(void);
@@ -319,18 +305,19 @@ static void draw_ellipse_tool_button(void);
 static void draw_all_shape_buttons(void);
 static void zoom_area_hide(void);
 static void zoom_area_show(void);
-static void zoom_area_pixels_save(void);
 static void zoom_cancel(void);
 static void zoom_redraw_icons(void);
-static void zoom_enter_view(void);
-static void zoom_exit_view(void);
-static void zoom_redraw_block(int sx, int sy);
 static void zoom_apply_changes(void);
 static uint8_t ui_icon_color(void);
-// static void draw_canvas_text_char(char ch, int x, int y, uint8_t fg, uint8_t transparent);
-// static void draw_canvas_text(const char *text, int x, int y, uint8_t fg, uint8_t transparent);
-static void draw_canvas_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color);
 static void draw_canvas_text_char(char ch, int px, int py, uint8_t fg_color, uint8_t bg_color);
-// static int text_width(const char *text);
+static void draw_canvas_text(const char *text, int px, int py, int max_x, uint8_t fg_color, uint8_t bg_color);
 
 #endif /* PAINT_HD_H */
+
+// static void clear_canvas_random_pixels(void);
+// static void clear_canvas_random_blocks8(void);
+// static void zoom_area_pixels_save(void);
+// static void zoom_enter_view(void);
+// static void zoom_exit_view(void);
+// static void zoom_redraw_block(int sx, int sy);
+// static int text_width(const char *text);

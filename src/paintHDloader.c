@@ -655,7 +655,7 @@ static void draw_tiles(void)
     int bx;
     uint16_t pixel_offset;
     uint8_t top_down;
-    uint8_t pattern;
+    // uint8_t pattern;
     uint16_t bmp_width_px;
     uint16_t abs_height;
     uint16_t file_stride;

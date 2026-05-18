@@ -84,7 +84,6 @@ unsigned char mouse_irq_fn(void);
 static void mouse_init(void);
 static void draw_pointer(uint8_t type);
 static void raw_set_pixel(int x, int y, uint8_t color);
-static void raw_toggle_pixel(int x, int y);
 static uint8_t snapshot_save_canvas(const char *path);
 static uint8_t snapshot_load_canvas(const char *path);
 static void zoom_area_pixels_save(void);
@@ -96,3 +95,5 @@ static void draw_canvas_text(const char *text, int x, int y, int max_x,
                              uint8_t fg, uint8_t bg);
 
 #endif /* PAINT_HD_ZOOM_H */
+
+// static void raw_toggle_pixel(int x, int y);

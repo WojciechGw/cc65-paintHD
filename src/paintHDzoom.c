@@ -121,17 +121,6 @@ static void raw_set_pixel(int x, int y, uint8_t color)
     else       RIA.rw0 = RIA.rw0 & (uint8_t)~mask;
 }
 
-static void raw_toggle_pixel(int x, int y)
-{
-    uint8_t mask;
-    if (x < 0 || x >= (int)GFX_CANVAS_WIDTH || y < 0 || y >= (int)GFX_CANVAS_HEIGHT)
-        return;
-    RIA.step0 = 0;
-    RIA.addr0 = CANVAS_DATA + (unsigned)y * CANVAS_STRIDE + (unsigned)x / 8u;
-    mask = (uint8_t)(0x80u >> (x & 7));
-    RIA.rw0 = RIA.rw0 ^ mask;
-}
-
 /* ── snapshot ───────────────────────────────────────────────────────────── */
 
 static uint8_t snapshot_save_canvas(const char *path)
@@ -531,6 +520,17 @@ int main(int argc, char *argv[])
 
         prev_buttons = buttons;
     }
-
-    return 0;
 }
+
+/*
+static void raw_toggle_pixel(int x, int y)
+{
+    uint8_t mask;
+    if (x < 0 || x >= (int)GFX_CANVAS_WIDTH || y < 0 || y >= (int)GFX_CANVAS_HEIGHT)
+        return;
+    RIA.step0 = 0;
+    RIA.addr0 = CANVAS_DATA + (unsigned)y * CANVAS_STRIDE + (unsigned)x / 8u;
+    mask = (uint8_t)(0x80u >> (x & 7));
+    RIA.rw0 = RIA.rw0 ^ mask;
+}
+*/
