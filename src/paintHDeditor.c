@@ -1734,8 +1734,8 @@ static void line_anchor_show_marker(void)
 static void zoom_area_toggle(void)
 {
     int x, y;
-    int x2 = zoom_area_marker_x + ZOOM_AREA - 1;
-    int y2 = zoom_area_marker_y + ZOOM_AREA - 1;
+    int x2 = zoom_area_marker_x + ZOOM_AREA_W - 1;
+    int y2 = zoom_area_marker_y + ZOOM_AREA_H - 1;
     for (x = zoom_area_marker_x; x <= x2; x++)
     {
         raw_toggle_pixel(x, zoom_area_marker_y);
@@ -1785,20 +1785,22 @@ static void zoom_area_pixels_save(void)
     int sy, bx;
     unsigned src_byte;
     uint8_t byte_val;
+    unsigned stride = ZOOM_AREA_W / 8u;
 
-    RIA.step1 = 1;
-    RIA.addr1 = ZOOM_AREA_BUF_ADDR;
-    for (sy = 0; sy < ZOOM_AREA; sy++)
+    for (sy = 0; sy < ZOOM_AREA_H; sy++)
     {
         src_byte = (unsigned)zoom_area_y * CANVAS_STRIDE
                    + (unsigned)zoom_area_x / 8u
                    + (unsigned)sy * CANVAS_STRIDE;
-        for (bx = 0; bx < ZOOM_AREA / 8; bx++)
+        for (bx = 0; bx < (int)stride; bx++)
         {
             RIA.step0 = 0;
             RIA.addr0 = src_byte + (unsigned)bx;
             byte_val = RIA.rw0;
-            RIA.rw1 = byte_val;
+            RIA.addr0 = ZOOM_AREA_BUF_ADDR + (unsigned)sy * stride + (unsigned)bx;
+            RIA.rw0 = byte_val;
+            RIA.addr0 = ZOOM_BUF_ADDR + (unsigned)sy * stride + (unsigned)bx;
+            RIA.rw0 = byte_val;
         }
     }
 }
@@ -1839,10 +1841,10 @@ static void zoom_area_move(int x, int y)
     nx = x;
     ny = y;
     if (nx < 0) nx = 0;
-    if (nx > (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA)) nx = (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA);
+    if (nx > (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA_W)) nx = (int)(GFX_CANVAS_WIDTH  - ZOOM_AREA_W);
     nx = (nx / 8) * 8;  /* align to byte boundary so pixel save/restore is exact */
     if (ny < 0) ny = 0;
-    if (ny > (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA)) ny = (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA);
+    if (ny > (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA_H)) ny = (int)(GFX_CANVAS_HEIGHT - ZOOM_AREA_H);
     if (nx == zoom_area_x && ny == zoom_area_y)
         return;
     zoom_area_hide();
@@ -1854,17 +1856,19 @@ static void zoom_area_move(int x, int y)
 static void zoom_redraw_block(int sx, int sy)
 {
     int py;
-    uint8_t v, bv;
+    uint8_t v, bv, byte_val, mask;
     unsigned row_addr;
 
-    RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
-    RIA.step1 = 0;
-    v = RIA.rw1;
+    RIA.step0 = 0;
+    RIA.addr0 = ZOOM_BUF_ADDR + (unsigned)sy * (ZOOM_AREA_W / 8u) + (unsigned)sx / 8u;
+    byte_val = RIA.rw0;
+    mask = (uint8_t)(0x80u >> (sx & 7));
+    v = (byte_val & mask) ? 1u : 0u;
 
     for (py = 0; py < ZOOM_DOT; py++)
     {
         row_addr = (unsigned)(ZOOM_FRAME_Y0 + (sy + 1) * ZOOM_DOT + py)
-                   * CANVAS_STRIDE + 23u + 1u + (unsigned)sx;
+                   * CANVAS_STRIDE + ZOOM_FRAME_X0_BYTE + 1u + (unsigned)sx;
         RIA.addr0 = row_addr;
         RIA.step0 = 0;
         bv = v ? 0xFF : 0x00;
@@ -1880,14 +1884,21 @@ static void zoom_apply_changes(void)
     uint8_t v;
 
     snapshot_load_canvas("TMP/paintHD_zoom.bin");
-    RIA.addr1 = ZOOM_BUF_ADDR;
-    RIA.step1 = 1;
-    for (sy = 0; sy < ZOOM_AREA; sy++)
-        for (sx = 0; sx < ZOOM_AREA; sx++)
+    for (sy = 0; sy < ZOOM_AREA_H; sy++)
+    {
+        uint8_t b;
+        for (sx = 0; sx < ZOOM_AREA_W; sx++)
         {
-            v = RIA.rw1;
-            raw_set_pixel(zoom_area_x + sx, zoom_area_y + sy, v ? 1 : 0);
+            if ((sx & 7) == 0)
+            {
+                RIA.step0 = 0;
+                RIA.addr0 = ZOOM_BUF_ADDR + (unsigned)sy * (ZOOM_AREA_W / 8u) + (unsigned)(sx / 8u);
+                b = RIA.rw0;
+            }
+            v = (b & (uint8_t)(0x80u >> (sx & 7u))) ? 1u : 0u;
+            raw_set_pixel(zoom_area_x + sx, zoom_area_y + sy, v);
         }
+    }
     zoom_exit_view();
     set_picker_status("");
 }
@@ -1898,67 +1909,47 @@ static void zoom_draw_view(void)
     uint8_t v, byte_val;
     unsigned row_addr;
 
-    /* read source pixels from XRAM backup into zoom scratch (port 1) */
-    {
-        uint8_t b;
-        int bit;
-        RIA.addr1 = ZOOM_BUF_ADDR;
-        RIA.step1 = 1;
-        for (sy = 0; sy < ZOOM_AREA; sy++)
-        {
-            for (sx = 0; sx < ZOOM_AREA; sx += 8)
-            {
-                RIA.step0 = 0;
-                RIA.addr0 = ZOOM_AREA_BUF_ADDR
-                            + (unsigned)sy * (ZOOM_AREA / 8u)
-                            + (unsigned)(sx / 8);
-                b = RIA.rw0;
-                for (bit = 7; bit >= 0; bit--)
-                    RIA.rw1 = (b >> bit) & 1u;
-            }
-        }
-    }
-
-    /* 
-       draw 34x34 blocks (sy=-1..32: top frame + 32 pixel rows + bottom frame)
-       port 0: byte write (addr0+step0=1, 34 bytes/row)
-       port 1: XRAM read  (addr1+step1=1, 32 pixels/row)
-       ports 0 and 1 are independent — safe to use simultaneously
-       grid via XOR on byte_val:
-         vertical:   py=1,3,5 -> XOR 0x01 (bit 0 = right pixel of block)
-         horizontal: py=7     -> XOR 0x55 (bits 6,4,2,0 = px 1,3,5,7) 
-    */
-    for (sy = -1; sy <= ZOOM_AREA; sy++)
+    for (sy = -1; sy <= ZOOM_AREA_H; sy++)
     {
         for (py = 0; py < ZOOM_DOT; py++)
         {
             row_addr = (unsigned)(ZOOM_FRAME_Y0 + (sy + 1) * ZOOM_DOT + py)
-                       * CANVAS_STRIDE + 23u;
+                       * CANVAS_STRIDE + ZOOM_FRAME_X0_BYTE;
             RIA.addr0 = row_addr;
             RIA.step0 = 1;
 
-            if (sy >= 0 && sy < ZOOM_AREA)
+            if (sy >= 0 && sy < ZOOM_AREA_H)
             {
-                RIA.rw0 = (py % 2); /* left frame block */
-                RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA;
-                RIA.step1 = 1;
-                for (sx = 0; sx < ZOOM_AREA; sx++)
+                uint8_t b;
+                RIA.rw0 = (py % 2);
+                for (sx = 0; sx < ZOOM_AREA_W; sx++)
                 {
-                    v = RIA.rw1;
+                    if ((sx & 7) == 0)
+                    {
+                        RIA.step0 = 0;
+                        RIA.addr0 = ZOOM_BUF_ADDR + (unsigned)sy * (ZOOM_AREA_W / 8u) + (unsigned)(sx / 8u);
+                        b = RIA.rw0;
+                        RIA.addr0 = row_addr + 1u + (unsigned)sx;
+                        RIA.step0 = 0;
+                    }
+                    v = (b & (uint8_t)(0x80u >> (sx & 7u))) ? 1u : 0u;
                     byte_val = v ? 0xFF : 0x00;
                     if (py == 1 || py == 3 || py == 5) byte_val ^= 0b00000001;
                     if (py == 7) byte_val ^= 0b01010101;
                     RIA.rw0 = byte_val;
+                    RIA.addr0++;
                 }
-                RIA.rw0 = (sy > 5 && py == 0 && !(sy % 8)) ? 0b11111111 : 0b00000000; /* right frame block */
+                RIA.addr0 = row_addr + 1u + ZOOM_AREA_W;
+                RIA.step0 = 0;
+                RIA.rw0 = (sy > 5 && py == 0 && !(sy % 8)) ? 0b11111111 : 0b00000000;
             }
             else
             {
-                for (i = 0; i < 33; i++){
-                    if(sy == -1 && i < 25 && py < 7 && !(i % 8)) {
+                for (i = 0; i < ZOOM_AREA_W + 2; i++){
+                    if(sy == -1 && py < 7 && (i % ZOOM_DOT) == 0) {
                         RIA.rw0 = 0b00000001;
                     } else if(sy == -1 && py == 7){
-                        RIA.rw0 = (i >= 1 && i <= 32) ? 0b01010101 : 0b00000001;
+                        RIA.rw0 = (i >= 1 && i <= ZOOM_AREA_W) ? 0b01010101 : 0b00000001;
                     } else {
                         RIA.rw0 = 0b00000000;
                     }

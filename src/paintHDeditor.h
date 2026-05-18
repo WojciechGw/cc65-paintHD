@@ -91,18 +91,20 @@
 
 #define CANVAS_STRIDE 80u
 
-#define ZOOM_AREA      32
+#define ZOOM_AREA_W    64
+#define ZOOM_AREA_H    48
 #define ZOOM_DOT       8
-#define ZOOM_VIEW_W    256   /* 32 * 8 = pixel block area width */
-#define ZOOM_VIEW_H    256   /* 32 * 8 = pixel block area height */
-#define ZOOM_VIEW_X0   192   /* pixel blocks start: ZOOM_FRAME_X0 + 8 */
-#define ZOOM_VIEW_Y0   112   /* pixel blocks start: ZOOM_FRAME_Y0 + 8 */
-#define ZOOM_FRAME_X0  184   /* byte-aligned left edge of full area (23*8) */
-#define ZOOM_FRAME_Y0  104   /* top edge of full area, (480-272)/2 */
-#define ZOOM_FRAME_W   272   /* 34 * 8: 32 pixel blocks + 1 frame block each side */
-#define ZOOM_FRAME_H   272
-#define ZOOM_BUF_ADDR      0xF600u  /* XRAM scratch: 32*32=1024 B */
-#define ZOOM_AREA_BUF_ADDR 0xFA00u  /* canvas area backup: 32*4=128 B (1bpp) */
+#define ZOOM_VIEW_W    512   /* 64 * 8 = pixel block area width */
+#define ZOOM_VIEW_H    384   /* 48 * 8 = pixel block area height */
+#define ZOOM_VIEW_X0   64    /* pixel blocks start: ZOOM_FRAME_X0 + ZOOM_DOT */
+#define ZOOM_VIEW_Y0   48    /* pixel blocks start: ZOOM_FRAME_Y0 + ZOOM_DOT */
+#define ZOOM_FRAME_X0  56    /* byte-aligned left edge (7*8), (640-528)/2 */
+#define ZOOM_FRAME_Y0  40    /* top edge of full area, (480-400)/2 */
+#define ZOOM_FRAME_W   528   /* 66*8: 64 pixel blocks + 1 frame block each side */
+#define ZOOM_FRAME_H   400   /* 50*8: 48 pixel blocks + 1 frame block each side */
+#define ZOOM_FRAME_X0_BYTE  (ZOOM_FRAME_X0 / 8u)   /* = 7u */
+#define ZOOM_AREA_BUF_ADDR 0x9600u  /* canvas area backup: 64*48/8=384 B (1bpp) */
+#define ZOOM_BUF_ADDR      0x9780u  /* edit scratch:       64*48/8=384 B (1bpp) */
 
 #define HID_A 0x04
 #define HID_M 0x10
