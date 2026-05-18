@@ -55,7 +55,6 @@ static int line_anchor_marker_x;
 static int line_anchor_marker_y;
 static bool zoom_area_active;
 static bool zoom_area_visible;
-static bool zoom_view_active;
 static int zoom_area_x;
 static int zoom_area_y;
 static int zoom_area_marker_x;
@@ -113,6 +112,9 @@ static uint8_t primitive_ellipse_ready;
 
 static const char clipboard_path[] = "TMP/painthd_clip.bin";
 static const char current_snapshot_path[] = "TMP/paintHD_c.bin";
+static const char zoom_snapshot_path[] = "TMP/paintHD_zoom.bin";
+static const char tmp_snapshot_path[] = "TMP/paintHD_tmp.bin";
+static const char str_cancelled[] = "cancelled";
 static uint8_t current_snapshot_valid;
 static uint8_t operation_cancelled;
 static uint8_t busy_mode;
@@ -596,7 +598,7 @@ static uint8_t prepare_undo_step(void)
                                 canvas_dirty ? 1u : 0u))
     {
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status("undo error");
         return 0;
@@ -626,7 +628,7 @@ static void perform_undo(void)
     {
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status("redo error");
         return;
@@ -635,7 +637,7 @@ static void perform_undo(void)
     {
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status("undo error");
         return;
@@ -645,7 +647,7 @@ static void perform_undo(void)
     if (!snapshot_refresh_current() && operation_was_cancelled())
     {
         busy_end();
-        set_picker_status("cancelled");
+        set_picker_status(str_cancelled);
     }
     else
     {
@@ -676,7 +678,7 @@ static void perform_redo(void)
     {
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status("undo error");
         return;
@@ -685,7 +687,7 @@ static void perform_redo(void)
     {
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status("redo error");
         return;
@@ -695,7 +697,7 @@ static void perform_redo(void)
     if (!snapshot_refresh_current() && operation_was_cancelled())
     {
         busy_end();
-        set_picker_status("cancelled");
+        set_picker_status(str_cancelled);
     }
     else
     {
@@ -1719,40 +1721,12 @@ static void zoom_area_show(void)
     zoom_area_visible = true;
 }
 
-static void zoom_redraw_icons(void)
-{
-    draw_swap_button();
-    draw_erase_button();
-    draw_invert_button();
-    draw_mirror_button();
-    draw_select_button();
-    draw_rect_tool_button();
-    draw_ellipse_tool_button();
-    draw_all_shape_buttons();
-    draw_picker_text_button("-", PICKER_MINUS_X);
-    draw_picker_text_button("+", PICKER_PLUS_X);
-}
-
-static void zoom_exit_view(void)
-{
-    zoom_view_active = false;
-    zoom_redraw_icons();
-}
-
 static void zoom_cancel(void)
 {
     if (zoom_area_active)
     {
         zoom_area_hide();
         zoom_area_active = false;
-        set_picker_status("");
-    }
-    if (zoom_view_active)
-    {
-        busy_begin();
-        snapshot_load_canvas("TMP/paintHD_zoom.bin");
-        busy_end();
-        zoom_exit_view();
         set_picker_status("");
     }
 }
@@ -1773,31 +1747,6 @@ static void zoom_area_move(int x, int y)
     zoom_area_x = nx;
     zoom_area_y = ny;
     zoom_area_show();
-}
-
-static void zoom_apply_changes(void)
-{
-    int sx, sy;
-    uint8_t v;
-
-    snapshot_load_canvas("TMP/paintHD_zoom.bin");
-    for (sy = 0; sy < ZOOM_AREA_H; sy++)
-    {
-        uint8_t b;
-        for (sx = 0; sx < ZOOM_AREA_W; sx++)
-        {
-            if ((sx & 7) == 0)
-            {
-                RIA.step0 = 0;
-                RIA.addr0 = ZOOM_BUF_ADDR + (unsigned)sy * (ZOOM_AREA_W / 8u) + (unsigned)(sx / 8u);
-                b = RIA.rw0;
-            }
-            v = (b & (uint8_t)(0x80u >> (sx & 7u))) ? 1u : 0u;
-            raw_set_pixel(zoom_area_x + sx, zoom_area_y + sy, v);
-        }
-    }
-    zoom_exit_view();
-    set_picker_status("");
 }
 
 static void paste_preview_cancel(void)
@@ -1829,7 +1778,7 @@ static void paste_preview_begin(uint8_t transparent)
     if (operation_was_cancelled())
     {
         busy_end();
-        set_picker_status("cancelled");
+        set_picker_status(str_cancelled);
         return;
     }
     busy_end();
@@ -1869,7 +1818,7 @@ static void clipboard_cut_selection(void)
     {
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         return;
     }
     if (!prepare_undo_step())
@@ -1884,7 +1833,7 @@ static void clipboard_cut_selection(void)
     snapshot_refresh_current();
     busy_end();
     if (operation_was_cancelled())
-        set_picker_status("cancelled");
+        set_picker_status(str_cancelled);
     else
         set_picker_status("CUT");
 }
@@ -1897,7 +1846,7 @@ static void clipboard_copy_selection(void)
     {
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         return;
     }
     busy_end();
@@ -1948,7 +1897,7 @@ static void clipboard_paste_apply(void)
             set_canvas_dirty(true);
             snapshot_refresh_current();
             busy_end();
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
             return;
         }
         if (read(fd, clipboard_row, clipboard_stride) != (int)clipboard_stride)
@@ -2685,7 +2634,7 @@ static void primitive_finish_drag(void)
     drawing_button = DRAW_BUTTON_NONE;
     busy_end();
     if (operation_was_cancelled())
-        set_picker_status("cancelled");
+        set_picker_status(str_cancelled);
     else
         set_picker_status(active_tool == TOOL_ELLIPSE ? "ellipse" : "rectangle");
 }
@@ -2908,35 +2857,12 @@ static void draw_mouse_coords(int x, int y)
     int py;
 
     out = text;
-    if (zoom_view_active)
-    {
-        int bx = x - (int)ZOOM_VIEW_X0;
-        int by = y - (int)ZOOM_VIEW_Y0;
-        int sx = (bx >= 0 && bx < (int)ZOOM_VIEW_W) ? bx / ZOOM_DOT : -1;
-        int sy = (by >= 0 && by < (int)ZOOM_VIEW_H) ? by / ZOOM_DOT : -1;
-        *out++ = '[';
-        if (sx >= 0 && sy >= 0)
-        {
-            out = append_coord_value(out, sx);
-            *out++ = ',';
-            out = append_coord_value(out, sy);
-        }
-        else
-        {
-            *out++ = '-';
-        }
-        *out++ = ']';
-        *out = '\0';
-    }
-    else
-    {
-        *out++ = '(';
-        out = append_coord_value(out, x);
-        *out++ = ',';
-        out = append_coord_value(out, y);
-        *out++ = ')';
-        *out = '\0';
-    }
+    *out++ = '(';
+    out = append_coord_value(out, x);
+    *out++ = ',';
+    out = append_coord_value(out, y);
+    *out++ = ')';
+    *out = '\0';
 
     draw_picker_box(PICKER_PANEL_COLOR, PICKER_COORDS_X, 1,
                     PICKER_COORDS_X + PICKER_COORDS_WIDTH - 1, 18);
@@ -3089,143 +3015,77 @@ static void draw_size_display(void)
 
 static uint8_t ui_icon_color(void)
 {
-    return zoom_view_active ? PICKER_SAVE_DISABLED_COLOR : PICKER_FG_COLOR;
+    return PICKER_FG_COLOR;
+}
+
+static void draw_icon_button(int x, const uint16_t *icon,
+                              uint8_t bg_color, uint8_t fg_color,
+                              uint8_t mirrored)
+{
+    int row, col;
+    uint16_t bits, mask;
+    uint8_t color;
+
+    draw_picker_box(bg_color, x, 1, x + PICKER_BUTTON_SIZE - 1, 18);
+    for (row = 0; row < 16; row++)
+    {
+        bits = icon[row];
+        for (col = 0; col < 16; col++)
+        {
+            mask = mirrored ? (uint16_t)(1u << col) : (uint16_t)(0x8000u >> col);
+            color = (bits & mask) ? fg_color : bg_color;
+            RIA.step0 = 0;
+            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (2 + row) + (x + col);
+            RIA.rw0 = color;
+        }
+    }
 }
 
 static void draw_swap_button(void)
 {
-    int x, y;
-    int row, col;
-    uint8_t mirrored;
-    uint16_t bits;
-    uint8_t color;
-    uint16_t mask;
-
-    y = 2;
-    x = PICKER_SWAP_X;
-    mirrored = left_color ? 0u : 1u;
-
-    draw_picker_box(PICKER_PANEL_COLOR, PICKER_SWAP_X, 1, PICKER_SWAP_X + PICKER_BUTTON_SIZE - 1, 18);
-    for (row = 0; row < 16; row++)
-    {
-        bits = swap_icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            if (mirrored)
-                mask = (uint16_t)(1u << col);
-            else
-                mask = (uint16_t)(0x8000u >> col);
-            color = (bits & mask) ? ui_icon_color() : PICKER_PANEL_COLOR;
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
-            RIA.rw0 = color;
-        }
-    }
+    draw_icon_button(PICKER_SWAP_X, swap_icon,
+                     PICKER_PANEL_COLOR, ui_icon_color(),
+                     left_color ? 0u : 1u);
 }
 
 static void draw_erase_button(void)
 {
-    int row, col;
-    int x, y;
     const uint16_t *icon;
-    uint16_t bits;
-    uint8_t color;
-
-    x = PICKER_ERASE_X;
-    y = 2;
     if (selection_mode_active())
         icon = left_color ? erase_icon_black_selected : erase_icon_white_selected;
     else
         icon = left_color ? erase_icon_black : erase_icon_white;
-    draw_picker_box(PICKER_PANEL_COLOR, PICKER_ERASE_X, 1,
-                    PICKER_ERASE_X + PICKER_BUTTON_SIZE - 1, 18);
-    for (row = 0; row < 16; row++)
-    {
-        bits = icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            color = (bits & (uint16_t)(0x8000u >> col)) ? ui_icon_color() : PICKER_PANEL_COLOR;
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
-            RIA.rw0 = color;
-        }
-    }
+    draw_icon_button(PICKER_ERASE_X, icon,
+                     PICKER_PANEL_COLOR, ui_icon_color(), 0u);
 }
 
 static void draw_save_button(void)
 {
-    int row, col;
-    uint16_t bits;
-    uint8_t color;
-    uint8_t icon_color;
-
-    draw_picker_box(PICKER_PANEL_COLOR, PICKER_SAVE_X, 1,
-                    PICKER_SAVE_X + PICKER_BUTTON_SIZE - 1, 18);
-    icon_color = canvas_dirty ? PICKER_FG_COLOR : PICKER_SAVE_DISABLED_COLOR;
-    for (row = 0; row < 16; row++)
-    {
-        bits = save_icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            color = (bits & (uint16_t)(0x8000u >> col)) ? icon_color : PICKER_PANEL_COLOR;
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (2 + row) + (PICKER_SAVE_X + col);
-            RIA.rw0 = color;
-        }
-    }
+    draw_icon_button(PICKER_SAVE_X, save_icon,
+                     PICKER_PANEL_COLOR,
+                     canvas_dirty ? PICKER_FG_COLOR : PICKER_SAVE_DISABLED_COLOR,
+                     0u);
 }
 
 static void draw_invert_button(void)
 {
-    int row;
-    int col;
-    uint16_t bits;
-    uint8_t color;
     const uint16_t *icon;
-
-    draw_picker_box(PICKER_PANEL_COLOR, PICKER_INVERT_X, 1,
-                    PICKER_INVERT_X + PICKER_BUTTON_SIZE - 1, 18);
     icon = (active_tool == TOOL_SELECT || selection_active || selection_dragging)
                ? invert_selected_icon
                : invert_icon;
-    for (row = 0; row < 16; row++)
-    {
-        bits = icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            color = (bits & (uint16_t)(0x8000u >> col)) ? ui_icon_color() : PICKER_PANEL_COLOR;
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (2 + row) + (PICKER_INVERT_X + col);
-            RIA.rw0 = color;
-        }
-    }
+    draw_icon_button(PICKER_INVERT_X, icon,
+                     PICKER_PANEL_COLOR, ui_icon_color(), 0u);
 }
 
 static void draw_mirror_button(void)
 {
-    int row;
-    int col;
-    uint16_t bits;
-    uint8_t color;
     const uint16_t *icon;
-
-    draw_picker_box(PICKER_PANEL_COLOR, PICKER_MIRROR_X, 1,
-                    PICKER_MIRROR_X + PICKER_BUTTON_SIZE - 1, 18);
     if (selection_mode_active())
         icon = mirror_vertical ? mirrorV_tool_selected_icon : mirrorH_tool_selected_icon;
     else
         icon = mirror_vertical ? mirrorV_tool_icon : mirrorH_tool_icon;
-    for (row = 0; row < 16; row++)
-    {
-        bits = icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            color = (bits & (uint16_t)(0x8000u >> col)) ? ui_icon_color() : PICKER_PANEL_COLOR;
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (2 + row) + (PICKER_MIRROR_X + col);
-            RIA.rw0 = color;
-        }
-    }
+    draw_icon_button(PICKER_MIRROR_X, icon,
+                     PICKER_PANEL_COLOR, ui_icon_color(), 0u);
 }
 
 static void invert_region(int x1, int y1, int x2, int y2)
@@ -3466,7 +3326,7 @@ static void perform_mirror_action(void)
     snapshot_refresh_current();
     busy_end();
     if (operation_was_cancelled())
-        set_picker_status("cancelled");
+        set_picker_status(str_cancelled);
     else
         set_picker_status(status_text);
 }
@@ -3486,7 +3346,7 @@ static void wipe_canvas_region(void)
     {
         fill_rect(selection_x1, selection_y1, selection_x2, selection_y2, fill_color);
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status("wipe selection");
         return;
@@ -3498,7 +3358,7 @@ static void wipe_canvas_region(void)
     }
     fill_canvas(BLACK, 0b00000000, 1u, 0u);
     if (operation_was_cancelled())
-        set_picker_status("cancelled");
+        set_picker_status(str_cancelled);
     else
         set_picker_status("wipe all");
 }
@@ -3512,11 +3372,6 @@ static void save_canvas_bmp(void)
     busy_begin();
     operation_cancel_begin();
     zoom_area_hide();
-    if (zoom_view_active)
-    {
-        snapshot_load_canvas("TMP/paintHD_zoom.bin");
-        zoom_view_active = false;
-    }
     crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
@@ -3531,7 +3386,7 @@ static void save_canvas_bmp(void)
         busy_end();
         if (rc == -2)
         {
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
             return;
         }
         set_picker_status("[!] SAVE error");
@@ -3555,11 +3410,6 @@ static void save_canvas_bmp_force(const char *path)
     busy_begin();
     operation_cancel_begin();
     zoom_area_hide();
-    if (zoom_view_active)
-    {
-        snapshot_load_canvas("TMP/paintHD_zoom.bin");
-        zoom_view_active = false;
-    }
     crosshair_hide();
     paste_preview_hide();
     primitive_hide_overlay();
@@ -3588,7 +3438,7 @@ static void init_canvas(void)
         if (g_argc >= 3 && strcmp(g_argv[2], "--from-zoom") == 0)
         {
             /* returning from paintHDzoom — canvas is in TMP/paintHD_zoom.bin */
-            snapshot_load_canvas("TMP/paintHD_zoom.bin");
+            snapshot_load_canvas(zoom_snapshot_path);
             if (g_argc >= 5)
             {
                 undo_count = (uint8_t)(unsigned)atoi(g_argv[3]);
@@ -3676,100 +3526,33 @@ static void draw_shape_icon(uint8_t shape, int px, int py, uint8_t invert, uint8
 
 static void draw_select_button(void)
 {
-    int row;
-    int col;
-    int x;
-    int y;
-    uint8_t active;
-    uint16_t bits;
-    uint8_t color;
-
-    active = selection_mode_active();
-    x = PICKER_SELECT_X;
-    y = 2;
-    draw_picker_box(active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
-                    x, 1, x + PICKER_BUTTON_SIZE - 1, 18);
-    for (row = 0; row < 16; row++)
-    {
-        bits = select_icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            color = (bits & (uint16_t)(0x8000u >> col))
-                        ? (active ? PICKER_PANEL_COLOR : ui_icon_color())
-                        : (active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR);
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
-            RIA.rw0 = color;
-        }
-    }
+    uint8_t active = selection_mode_active();
+    draw_icon_button(PICKER_SELECT_X, select_icon,
+                     active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
+                     active ? PICKER_PANEL_COLOR : ui_icon_color(),
+                     0u);
 }
 
 static void draw_rect_tool_button(void)
 {
-    int row;
-    int col;
-    int x;
-    int y;
-    uint8_t active;
-    uint8_t enabled;
-    uint16_t bits;
-    uint8_t color;
-    uint8_t icon_color;
-
-    enabled = primitive_tools_enabled();
-    active = enabled && (active_tool == TOOL_RECT);
-    x = PICKER_RECT_X;
-    y = 2;
-    draw_picker_box(active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
-                    x, 1, x + PICKER_BUTTON_SIZE - 1, 18);
-    icon_color = enabled ? ui_icon_color() : PICKER_SAVE_DISABLED_COLOR;
-    for (row = 0; row < 16; row++)
-    {
-        bits = rect_tool_icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            color = (bits & (uint16_t)(0x8000u >> col))
-                        ? (active ? PICKER_PANEL_COLOR : icon_color)
-                        : (active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR);
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
-            RIA.rw0 = color;
-        }
-    }
+    uint8_t enabled = primitive_tools_enabled();
+    uint8_t active = enabled && (active_tool == TOOL_RECT);
+    uint8_t icon_color = enabled ? ui_icon_color() : PICKER_SAVE_DISABLED_COLOR;
+    draw_icon_button(PICKER_RECT_X, rect_tool_icon,
+                     active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
+                     active ? PICKER_PANEL_COLOR : icon_color,
+                     0u);
 }
 
 static void draw_ellipse_tool_button(void)
 {
-    int row;
-    int col;
-    int x;
-    int y;
-    uint8_t active;
-    uint8_t enabled;
-    uint16_t bits;
-    uint8_t color;
-    uint8_t icon_color;
-
-    enabled = primitive_tools_enabled();
-    active = enabled && (active_tool == TOOL_ELLIPSE);
-    x = PICKER_ELLIPSE_X;
-    y = 2;
-    draw_picker_box(active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
-                    x, 1, x + PICKER_BUTTON_SIZE - 1, 18);
-    icon_color = enabled ? ui_icon_color() : PICKER_SAVE_DISABLED_COLOR;
-    for (row = 0; row < 16; row++)
-    {
-        bits = ellipse_tool_icon[row];
-        for (col = 0; col < 16; col++)
-        {
-            color = (bits & (uint16_t)(0x8000u >> col))
-                        ? (active ? PICKER_PANEL_COLOR : icon_color)
-                        : (active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR);
-            RIA.step0 = 0;
-            RIA.addr0 = PICKER_DATA + PICKER_WIDTH * (y + row) + (x + col);
-            RIA.rw0 = color;
-        }
-    }
+    uint8_t enabled = primitive_tools_enabled();
+    uint8_t active = enabled && (active_tool == TOOL_ELLIPSE);
+    uint8_t icon_color = enabled ? ui_icon_color() : PICKER_SAVE_DISABLED_COLOR;
+    draw_icon_button(PICKER_ELLIPSE_X, ellipse_tool_icon,
+                     active ? PICKER_FG_COLOR : PICKER_PANEL_COLOR,
+                     active ? PICKER_PANEL_COLOR : icon_color,
+                     0u);
 }
 
 static void draw_shape_button(uint8_t shape)
@@ -4119,6 +3902,18 @@ static void drawing_session_end(void)
     crosshair_show();
 }
 
+static uint8_t click_is_double(clock_t *last_click, clock_t now)
+{
+    if (*last_click != 0 &&
+        (clock_t)(now - *last_click) <= (clock_t)DOUBLE_CLICK_TICKS)
+    {
+        *last_click = 0;
+        return 1u;
+    }
+    *last_click = now;
+    return 0u;
+}
+
 static void left_press(int x, int y)
 {
     static clock_t last_drag_click;
@@ -4141,7 +3936,7 @@ static void left_press(int x, int y)
             zoom_area_hide();
             zoom_area_active = false;
             busy_begin();
-            snapshot_save_canvas("TMP/paintHD_zoom.bin");
+            snapshot_save_canvas(zoom_snapshot_path);
             busy_end();
             sprintf(sx, "%d", zoom_area_x);
             sprintf(sy, "%d", zoom_area_y);
@@ -4168,7 +3963,7 @@ static void left_press(int x, int y)
     {
         help_pending = 0;
         busy_begin();
-        snapshot_load_canvas("TMP/paintHD_tmp.bin");
+        snapshot_load_canvas(tmp_snapshot_path);
         busy_end();
         return;
     }
@@ -4282,8 +4077,6 @@ static void left_press(int x, int y)
         has_line_anchor = false;
         ctrl_line_session_active = false;
     }
-    if (zoom_view_active)
-        return;
     if (num == 9)
     {
         now = clock();
@@ -4308,17 +4101,8 @@ static void left_press(int x, int y)
     }
     if (num == 10 + SHAPE_VERT)
     {
-        now = clock();
-        if (last_vert_click != 0 &&
-            (clock_t)(now - last_vert_click) <= (clock_t)DOUBLE_CLICK_TICKS)
-        {
+        if (click_is_double(&last_vert_click, clock()))
             toggle_vert_brush_flip();
-            last_vert_click = 0;
-        }
-        else
-        {
-            last_vert_click = now;
-        }
     }
     else
     {
@@ -4326,17 +4110,8 @@ static void left_press(int x, int y)
     }
     if (num == 10 + SHAPE_DIAG)
     {
-        now = clock();
-        if (last_diag_click != 0 &&
-            (clock_t)(now - last_diag_click) <= (clock_t)DOUBLE_CLICK_TICKS)
-        {
+        if (click_is_double(&last_diag_click, clock()))
             toggle_diag_brush_flip();
-            last_diag_click = 0;
-        }
-        else
-        {
-            last_diag_click = now;
-        }
     }
     else
     {
@@ -4418,7 +4193,7 @@ static void left_press(int x, int y)
         snapshot_refresh_current();
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status(status_text);
     }
@@ -4608,7 +4383,7 @@ static void right_press(int x, int y)
         snapshot_refresh_current();
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status(status_text);
     }
@@ -4627,7 +4402,7 @@ static void right_press(int x, int y)
         snapshot_refresh_current();
         busy_end();
         if (operation_was_cancelled())
-            set_picker_status("cancelled");
+            set_picker_status(str_cancelled);
         else
             set_picker_status(status_text);
     }
@@ -4779,12 +4554,9 @@ static void mouse(void)
     mb = rw;
     if (pressed & 1)  left_press(x, y);
     if (released & 1) left_release();
-    if (!zoom_view_active)
-    {
-        if (pressed & 2)  right_press(x, y);
-        if (released & 2) right_release();
-    }
-    if (!zoom_view_active && (pressed & 4))
+    if (pressed & 2)  right_press(x, y);
+    if (released & 2) right_release();
+    if (pressed & 4)
     {
         zoom_cancel();
         if (crosshair_active)
@@ -4803,11 +4575,8 @@ static void mouse(void)
     rw = RIA.rw0;
     if (rw != prev_wheel)
     {
-        if (!zoom_view_active)
-        {
-            zoom_cancel();
-            change_brush_size((int8_t)(rw - prev_wheel));
-        }
+        zoom_cancel();
+        change_brush_size((int8_t)(rw - prev_wheel));
         prev_wheel = rw;
     }
 
@@ -4855,10 +4624,6 @@ static void mouse(void)
     if (zoom_area_active)
     {
         set_picker_hover_status("set area to zoom");
-    }
-    else if (zoom_view_active)
-    {
-        set_picker_hover_status("ZOOM");
     }
     else if (!canvas_input_locked() && !paste_preview_active &&
         active_tool == TOOL_BRUSH && brush_shape != SHAPE_FILL &&
@@ -5070,45 +4835,14 @@ int main(int argc, char *argv[]){
         {
             prev_ctrl_a = 0;
         }
-        if (zoom_view_active && key_pressed(HID_ENTER))
-        {
-            if (!prev_enter)
-            {
-                prev_enter = 1u;
-                canvas_modify_begin();
-                busy_begin();
-                zoom_apply_changes();
-                busy_end();
-                canvas_modify_end();
-            }
-        }
-        else
-        {
-            prev_enter = 0;
-        }
         if (key_pressed(HID_ESCAPE))
         {
             if (!prev_escape)
             {
-                if (help_pending)
-                {
-                    help_pending = 0;
-                    busy_begin();
-                    snapshot_load_canvas("TMP/paintHD_tmp.bin");
-                    busy_end();
-                }
-                else if (zoom_area_active)
+                if (zoom_area_active)
                 {
                     zoom_area_hide();
                     zoom_area_active = false;
-                    set_picker_status("");
-                }
-                else if (zoom_view_active)
-                {
-                    busy_begin();
-                    snapshot_load_canvas("TMP/paintHD_zoom.bin");
-                    busy_end();
-                    zoom_exit_view();
                     set_picker_status("");
                 }
                 else if (paste_preview_active)
@@ -5128,9 +4862,9 @@ int main(int argc, char *argv[]){
         {
         if (key_pressed(HID_F1))
         {
-            if (!zoom_view_active && !prev_f1 && !help_pending)
+            if (!prev_f1 && !help_pending)
             {
-                snapshot_save_canvas("TMP/paintHD_tmp.bin");
+                snapshot_save_canvas(tmp_snapshot_path);
                 snapshot_load_canvas("ROM:paintHDhelp.bin");
                 help_pending = 1u;
                 prev_f1 = 1u;
@@ -5142,7 +4876,7 @@ int main(int argc, char *argv[]){
         }
         if (key_pressed(HID_F2))
         {
-            if (!zoom_view_active && !prev_f2)
+            if (!prev_f2)
             {
                 undo_enabled = undo_enabled ? 0u : 1u;
                 set_picker_status(undo_enabled ? "undo ON" : "undo OFF");
@@ -5155,7 +4889,7 @@ int main(int argc, char *argv[]){
         }
         if (key_pressed(HID_F3))
         {
-            if (!zoom_view_active && !prev_f3)
+            if (!prev_f3)
             {
                 busy_begin();
                 operation_cancel_begin();
@@ -5284,7 +5018,7 @@ int main(int argc, char *argv[]){
         {
             prev_ctrl_v = 0;
         }
-        if (!canvas_input_locked() && !paste_preview_active && !zoom_view_active &&
+        if (!canvas_input_locked() && !paste_preview_active &&
             key_pressed(HID_LEFT_CTRL) && !alt_pressed() && key_pressed(HID_M))
         {
             if (!prev_ctrl_m)
