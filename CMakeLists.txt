@@ -34,3 +34,12 @@ target_sources(paintHDeditor PRIVATE
     src/bmp.c
 )
 target_link_options(paintHDeditor PRIVATE "-Wl" "-D__STACKSIZE__=0x0200") # default 0x0800 wastes RAM; 0x0200 verified sufficient
+
+add_executable(paintHDzoom)
+rp6502_asset(paintHDzoom 0x1EC00 assets/fonticons.bin)
+rp6502_executable(paintHDzoom DATA 0x200 RESET 0x200)
+target_sources(paintHDzoom PRIVATE
+    src/paintHDzoom.c
+    src/bmp.c
+)
+target_link_options(paintHDzoom PRIVATE "-Wl" "-D__STACKSIZE__=0x0200")

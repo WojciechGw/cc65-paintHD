@@ -3758,7 +3758,17 @@ static void init_canvas(void)
     fill_canvas(BLACK, 0b00000000, 1u, 0u);
     if (g_argc > 1)
     {
-        if (LoadBMP(g_argv[1], CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
+        if (g_argc >= 3 && strcmp(g_argv[2], "--from-zoom") == 0)
+        {
+            /* returning from paintHDzoom — canvas is in TMP/paintHD_zoom.bin */
+            snapshot_load_canvas("TMP/paintHD_zoom.bin");
+            if (g_argc >= 5)
+            {
+                undo_count = (uint8_t)(unsigned)atoi(g_argv[3]);
+                redo_count = (uint8_t)(unsigned)atoi(g_argv[4]);
+            }
+        }
+        else if (LoadBMP(g_argv[1], CANVAS_DATA, GFX_CANVAS_HEIGHT, GFX_CANVAS_WIDTH / 8) != 0)
         {
             busy_end();
             set_picker_status("ERROR");
@@ -4300,45 +4310,21 @@ static void left_press(int x, int y)
     {
         if (num < 0)
         {
+            char sx[6], sy[6], su[4], sr[4];
             zoom_area_hide();
             zoom_area_active = false;
             busy_begin();
             snapshot_save_canvas("TMP/paintHD_zoom.bin");
-            zoom_area_pixels_save();
-            zoom_draw_view();
             busy_end();
-            zoom_enter_view();
-            picker_hover_status = 0;
-            set_picker_hover_status("ZOOM");
+            sprintf(sx, "%d", zoom_area_x);
+            sprintf(sy, "%d", zoom_area_y);
+            sprintf(su, "%u", (unsigned)undo_count);
+            sprintf(sr, "%u", (unsigned)redo_count);
+            VIA.ier = 0x40;
+            ria_execl("paintHDzoom.rp6502", save_bmp_path, sx, sy, su, sr, NULL);
         }
         return;
     }
-
-    if (zoom_view_active)
-    {
-        if (num < 0)
-        {
-            int bx = x - (int)ZOOM_VIEW_X0;
-            int by = y - (int)ZOOM_VIEW_Y0;
-            if (bx >= 0 && bx < (int)ZOOM_VIEW_W && by >= 0 && by < (int)ZOOM_VIEW_H)
-            {
-                int sx = bx / ZOOM_DOT;
-                int sy = by / ZOOM_DOT;
-                RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
-                RIA.step1 = 0;
-                zoom_paint_value = RIA.rw1 ? 0 : 1;
-                RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
-                RIA.step1 = 0;
-                RIA.rw1 = zoom_paint_value;
-                zoom_redraw_block(sx, sy);
-                zoom_paint_armed = 1;
-                zoom_paint_last_sx = sx;
-                zoom_paint_last_sy = sy;
-            }
-            return;
-        }
-    }
-    else
 
     if (paste_preview_active)
     {
@@ -4621,7 +4607,6 @@ static void left_press(int x, int y)
 
 static void left_release(void)
 {
-    zoom_paint_armed = 0;
     if (selection_dragging)
         selection_finish_drag();
     if (primitive_dragging && drawing_button == DRAW_BUTTON_LEFT)
@@ -4868,26 +4853,6 @@ static void right_release(void)
 
 static void move(int x, int y)
 {
-    if (zoom_paint_armed)
-    {
-        int bx = x - (int)ZOOM_VIEW_X0;
-        int by = y - (int)ZOOM_VIEW_Y0;
-        if (bx >= 0 && bx < (int)ZOOM_VIEW_W && by >= 0 && by < (int)ZOOM_VIEW_H)
-        {
-            int sx = bx / ZOOM_DOT;
-            int sy = by / ZOOM_DOT;
-            if (sx != zoom_paint_last_sx || sy != zoom_paint_last_sy)
-            {
-                RIA.addr1 = ZOOM_BUF_ADDR + (unsigned)sy * ZOOM_AREA + (unsigned)sx;
-                RIA.step1 = 0;
-                RIA.rw1 = zoom_paint_value;
-                zoom_redraw_block(sx, sy);
-                zoom_paint_last_sx = sx;
-                zoom_paint_last_sy = sy;
-            }
-        }
-        return;
-    }
     if (is_dragging)
     {
         move_picker(x - drag_x, y - drag_y);
