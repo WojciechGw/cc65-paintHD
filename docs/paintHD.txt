@@ -1,20 +1,20 @@
 PaintHD
 
-PaintHD is a start application for the PaintHD main editor.
+PaintHD is a start application (launcher) for the PaintHD main editor.
 Run paintHD.rp6502 to open the file browser and choose an existing image or create a new one.
 
 Purpose
 
-PaintHD Loader is a file browser for PaintHD. Its job is to scan the program
+PaintHD launcher is a file browser for PaintHD. Its job is to scan the program
 directory for BMP files, present them as a simple 3 x 3 selection grid (with paging),
 and start the main editor with the file chosen by the user.
 
-The loader is intended to make opening recent bitmap files faster and more
+The launcher is intended to make opening recent bitmap files faster and more
 convenient than typing file names manually.
 
 How It Works
 
-1. The loader switches to the PaintHD graphics mode.
+1. The launcher switches to the PaintHD graphics mode.
 2. The program directory is scanned for BMP files and sorted newest first.
 3. Up to 15 files are shown on the first page as 160 x 120 pixel tiles.
 4. The top-left tile on the first page is always the "Create a New Image" tile.

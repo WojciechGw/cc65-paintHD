@@ -17,12 +17,17 @@
 
 #include "paintHDzoom.h"
 
-void *__fastcall__ argv_mem(size_t size)
-{
-    static uint8_t buf[512];
-    if (size > sizeof(buf)) return NULL;
-    return buf;
-}
+//#define WITHMALLOC
+
+#ifdef WITHMALLOC
+    void *__fastcall__ argv_mem(size_t size) { return malloc(size); }
+#else
+    void *__fastcall__ argv_mem(size_t size) {
+        static uint8_t buf[512];
+        if (size > sizeof(buf)) return NULL;
+        return buf;
+    }
+#endif
 
 /* ── state ─────────────────────────────────────────────────────────────── */
 

@@ -21,9 +21,8 @@ The suite consists of three programs:
 | `paintHDeditor.rp6502` | main editor |
 | `paintHDzoom.rp6502` | Pixel-level zoom editor (launched automatically by the main editor) |
 
-> Copy all three `.rp6502` files and the ROM assets to the same directory on the SD card
-> (no need to create a `TMP` subdirectory),
-> then run `paintHD.rp6502`.
+> Copy all three `.rp6502` files to the same directory on any drive
+> then simply run `paintHD.rp6502`.
 
 ## Main Applications
 
@@ -359,16 +358,15 @@ From left to right, the picker contains:
 
 ### Runtime Directories
 
-It is recommended to preserve the directory structure shown below, but it is not strictly necessary
 PaintHD required only one thing : all three programs must be in the same directory.
+It is recommended to preserve the directory structure shown below, but it is not strictly necessary
 
-- `./`  
+- `./`
   Application root directory.
   place `paintHD.rp6502`, `paintHDeditor.rp6502` and `paintHDzoom.rp6502` in the same directory
-  + - TMP (create by paintHD)
 
 - `./TMP/`  
-  Temporary working directory used by PaintHD
+  Temporary working directory used by PaintHD (created by paintHD)
 
 ### Runtime Temporary Files
 
