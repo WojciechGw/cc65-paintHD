@@ -1,0 +1,120 @@
+PaintHD
+
+PaintHD is a start application for the PaintHD main editor.
+Run paintHD.rp6502 to open the file browser and choose an existing image or create a new one.
+
+Purpose
+
+PaintHD Loader is a file browser for PaintHD. Its job is to scan the program
+directory for BMP files, present them as a simple 3 x 3 selection grid (with paging),
+and start the main editor with the file chosen by the user.
+
+The loader is intended to make opening recent bitmap files faster and more
+convenient than typing file names manually.
+
+How It Works
+
+1. The loader switches to the PaintHD graphics mode.
+2. The program directory is scanned for BMP files and sorted newest first.
+3. Up to 15 files are shown on the first page as 160 x 120 pixel tiles.
+4. The top-left tile on the first page is always the "Create a New Image" tile.
+5. Each occupied tile displays:
+   - a monochrome thumbnail of the BMP file,
+   - the file name on a white label strip above the tile.
+6. Empty tile slots are shown blank.
+7. The user selects a tile with the mouse.
+8. After selection, the loader starts `paintHDeditor.rp6502` with the chosen file.
+
+If the "Create a New Image" tile is selected, a keyboard prompt appears inside
+the tile asking for a file name (max 20 characters, a-z A-Z 0-9 _ - + = [ ]).
+Enter confirms and creates a blank 128 x 128 BMP, ESC cancels back to the grid.
+If the entered name already exists on disk, an error is shown and input is requested again.
+
+If no BMP files are found in the program directory, only the "Create a New Image"
+tile is shown.
+
+Display Layout
+
+- Screen size: 640 x 480 pixels
+- Tile size: 160 x 120 pixels
+- Grid layout: 3 columns x 3 rows
+- Tiles per page: 9
+- First page: 1 "Create a New Image" tile + up to 8 BMP file tiles
+- Subsequent pages: up to 9 BMP file tiles
+
+Occupied and Empty Tiles
+
+- "Create a New Image" tile (slot 0, page 0 only):
+  - shown with a white label "*** Create a New Image ***".
+  - clicking opens a keyboard prompt to enter a new file name.
+- Occupied tile:
+  - shows a thumbnail of the BMP image,
+  - shows the file name on a label strip above the tile.
+- Empty tile:
+  - shown blank, not clickable.
+
+Controls
+
+Mouse
+
+- Move mouse: move the on-screen pointer
+- Left mouse button on the "Create a New Image" tile:
+  - opens the filename prompt; type a name and press ENTER to create and open it
+- Left mouse button on an occupied tile:
+  - launch PaintHDEditor with that BMP file
+
+Filename Prompt
+
+- Appears inside the "Create a New Image" tile when that tile is clicked.
+- Accepted characters: a-z, A-Z, 0-9, _ - + = [ ]
+- Maximum length: 20 characters
+- ENTER confirms; a blank 128 x 128 BMP is created and the editor is launched.
+- ESC cancels and returns to the tile grid.
+
+Keyboard
+
+- `PgUp` -> show the previous page of tiles
+- `PgDn` -> show the next page of tiles
+
+Paging
+
+If there are more than 15 BMP files in the program directory, the loader splits
+them into multiple pages (first page: 15 files; subsequent pages: 16 files each).
+Use `PgUp` and `PgDn` to browse older or newer groups of files.
+
+File Sorting
+
+Files are listed newest first, sorted by file system date and time.
+
+File Selection Rules
+
+- The loader scans the program directory for BMP files.
+- File names are displayed above each tile.
+- When the user clicks a tile containing a file, that file becomes the startup
+  argument for PaintHDEditor.
+- When the user clicks the "Create a New Image" tile, the filename prompt appears.
+
+Page Cache
+
+Rendered tile pages are cached to `TMP/loader_p###.bin` so that returning to a
+previously visited page is instant. The cache is rebuilt at each startup.
+
+Directories
+
+The loader auto-creates the `TMP` subdirectory in the program directory on
+startup if it does not already exist.
+
+Notes
+
+- PaintHD Loader is only a launcher. It does not edit images.
+- The actual editing is performed by `paintHDeditor.rp6502`.
+- The loader is designed for monochrome BMP content and monochrome thumbnails.
+
+Copyright
+
+PaintHD
+Copyright (c) 2026 WojciechGw
+based on paint.c example
+Copyright (c) 2025 Rumbledethumps
+
+SPDX-License-Identifier: BSD-3-Clause

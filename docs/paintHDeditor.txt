@@ -3,6 +3,16 @@ PaintHD
 PaintHD is a monochrome bitmap paint program for the Picocomputer RP6502 target.
 It works on a 640x480 canvas in 1-bit color mode and stores images as monochrome BMP files.
 
+The suite consists of three programs:
+
+- paintHD.rp6502       - start application file browser
+- paintHDeditor.rp6502 - the main editor
+- paintHDzoom.rp6502   - pixel-level zoom editor (launched by the main editor)
+
+To use PaintHD, copy all three .rp6502 files 
+to the same directory on the SD card (no need to create a TMP subdirectory)
+then run paintHD.rp6502
+
 Overview
 
 - Left mouse button and right mouse button paint with opposite colors.
@@ -18,7 +28,7 @@ Toolbar
 - Double-clicking the mirror icon toggles between vertical and horizontal mirror mode.
 - Minus and plus change brush size by one step.
 - Single click on the size field sets size to 1 px.
-- Double-click on the size field sets size to 5 px.
+- Double-click on the size field sets size to 32 px (mid).
 - Triple-click on the size field sets size to the maximum (64 px) size.
 - The status field shows operation results, selection state, paste mode, tool changes, and hover descriptions for toolbar icons.
 
@@ -41,12 +51,12 @@ Mouse and keyboard
 - Ctrl + Q saves the image to "paintHD_save.bmp" and exit.
 - Ctrl + S saves the image to the current save file.
 - Ctrl + V starts opaque paste preview.
-- Shift + Ctrl + V starts transparent paste preview.
+- Ctrl + Alt + V starts transparent paste preview.
 - Ctrl + X copies the current selection and clears the selected area.
 - Ctrl + Y performs redo.
 - Ctrl + Shift + Alt + F draws a 16x16 glyph table of the built-in font at the current cursor position.
 - Ctrl + Z performs undo.
-- F1 shows the help screen.
+- F1 shows the help screen; click LMB anywhere to return.
 - F2 toggles undo on and off.
 - F3 saves the current image as an undo checkpoint.
 - Esc cancels selection mode, paste preview, primitive preview, zoom mode, and long operations that support cancellation.
@@ -116,7 +126,7 @@ Zoom pixel editor
 
 - Ctrl + M enters zoom area selection mode.
 - The zoom area marker follows the pointer; click LMB on the canvas to open the pixel editor for that area.
-- The pixel editor shows a 32x32 pixel area as 8x8 pixel blocks.
+- The pixel editor shows a 64x48 pixel area as 8x8 pixel blocks.
 - All toolbar icons are dimmed and disabled while the pixel editor is open; F1, F2, and F3 are also disabled.
 - The toolbar can still be moved by dragging its handle during zoom.
 - Click LMB on a block to toggle it; hold LMB and drag to paint multiple blocks with the same value.

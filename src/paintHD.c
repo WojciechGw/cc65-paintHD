@@ -1,11 +1,11 @@
 /*
- * PaintHD loader
+ * PaintHD - start point for suite
  * Copyright (c) 2026 WojciechGw
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "paintHDloader.h"
+#include "paintHD.h"
 
 #define RELEASE
 
@@ -1112,6 +1112,8 @@ int main(int argc, char *argv[])
     }
     #endif
 
+    ria_attr_set(1, RIA_ATTR_LAUNCHER);
+    
     xreg_vga_canvas(GFX_CANVAS_TYPE);
 
     xram0_struct_set(CANVAS_STRUCT, vga_mode3_config_t, x_wrap, false);

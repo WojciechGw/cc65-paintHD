@@ -11,14 +11,32 @@ SPDX-License-Identifier: BSD-3-Clause
 
 PaintHD is a monochrome bitmap paint program for the Picocomputer RP6502 target.
 It works on a `640 x 480` canvas in `1 bpp` mode and stores images as monochrome
-BMP files. The project also includes `paintHDloader`, a small launcher that
-builds file thumbnails and starts PaintHD with a selected image.
+BMP files.
+
+The suite consists of three programs:
+
+| Program | Description |
+|---|---|
+| `paintHD.rp6502` | **File browser and launcher — start here** |
+| `paintHDeditor.rp6502` | main editor |
+| `paintHDzoom.rp6502` | Pixel-level zoom editor (launched automatically by the main editor) |
+
+> Copy all three `.rp6502` files and the ROM assets to the same directory on the SD card
+> (no need to create a `TMP` subdirectory),
+> then run `paintHD.rp6502`.
 
 ## Main Applications
 
 [!] Please read the `Disk Directories and Runtime Files` section below before use.
 
 ### `paintHD`
+
+A launcher for browsing BMP files in the program directory. It shows up to
+`16` thumbnails per page, supports paging with `PgUp` / `PgDn`, and launches
+`paintHD.rp6502` with the selected file. Empty slots can be used to start a new
+image using the default name `paintHD_new.bmp`.
+
+### `paintHDeditor`
 
 The editor itself. It provides direct mouse-based drawing, a movable toolbar
 picker, selection, clipboard operations, primitive shapes, save/restore, and
@@ -34,12 +52,6 @@ paintHD [file.bmp]
   new canvas saved as `paintHD_new.bmp`.
 - With a BMP filename: loads that file and uses it as the save target.
 
-### `paintHDloader`
-
-A launcher for browsing BMP files in the program directory. It shows up to
-`16` thumbnails per page, supports paging with `PgUp` / `PgDn`, and launches
-`paintHD.rp6502` with the selected file. Empty slots can be used to start a new
-image using the default name `paintHD_new.bmp`.
 
 ## PaintHD Overview
 
@@ -77,7 +89,7 @@ The canvas is always monochrome:
 - Double-click the vertical brush icon to switch between vertical and horizontal.
 - Double-click the diagonal brush icon to switch between left and right diagonal.
 - Single click on the brush size field sets size to `1 px`.
-- Double-click on the brush size field sets size to `5 px`.
+- Double-click on the brush size field sets size to `32 px` (mid).
 - Triple-click on the brush size field sets size to the maximum size (`64 px`).
 
 ### Straight Lines
@@ -165,14 +177,14 @@ Double-clicking the mirror icon switches between them.
 ### Help Screen
 
 Pressing `F1` temporarily replaces the canvas with the help image
-(`ROM:paintHDhelp.bmp`). Click `LMB` anywhere to return to the canvas.
+(`ROM:paintHDhelp.bin`). Click `LMB` anywhere to return to the canvas.
 The current file and dirty state are not affected.
 
 ### Zoom Pixel Editor
 
 - `Ctrl + M` enters zoom area selection mode.
 - Move the pointer to position the zoom area, then click `LMB` to open the pixel editor.
-- The pixel editor shows a 32×32 pixel area magnified as 8×8 pixel blocks.
+- The pixel editor shows a 64×48 pixel area magnified as 8×8 pixel blocks.
 - All toolbar icons are dimmed and disabled while the pixel editor is open; `F1`, `F2`, and `F3` are also disabled.
 - The toolbar can still be moved by dragging its handle during zoom.
 - Click `LMB` on a block to toggle it; hold `LMB` and drag to paint multiple blocks with the same value.
@@ -201,7 +213,7 @@ Long-running operations support `Esc` cancellation, including:
   support cancellation.
 
 - `F1`  
-  Show help screen. Click `LMB` to return.
+  Show help screen. Click `LMB` anywhere to return.
 
 - `F2`  
   Toggle undo on / off.
@@ -248,7 +260,7 @@ Long-running operations support `Esc` cancellation, including:
   Save to the current save file.
 
 - `Ctrl + Q`  
-  Save to `painthd_save.bmp` and exit.
+  Save to `paintHD_save.bmp` and exit.
 
 ## Mouse Controls
 
@@ -347,39 +359,35 @@ From left to right, the picker contains:
 
 ### Runtime Directories
 
-It is recommended to preserve the directory structure shown below, but it is not strictly necessary.
+It is recommended to preserve the directory structure shown below, but it is not strictly necessary
+PaintHD required only one thing : all three programs must be in the same directory.
 
-The most important requirement is to place `paintHDloader.rp6502` and `paintHD.rp6502` in the same directory as your BMP files, and to create a `TMP` directory there as well.
-
-- `MSCx:/paintHD/`  
+- `./`  
   Application root directory.
-  
-    ```  
-  MSCx:/paintHD (place `paintHD.rp6502` and `paintHDloader.rp6502` here)
-  + - TMP (create this directory before first use)
-  ```
+  place `paintHD.rp6502`, `paintHDeditor.rp6502` and `paintHDzoom.rp6502` in the same directory
+  + - TMP (create by paintHD)
 
-- `MSCx:/paintHD/TMP/`  
-  Temporary working directory used by PaintHD and the loader.
+- `./TMP/`  
+  Temporary working directory used by PaintHD
 
 ### Runtime Temporary Files
 
-- `MSCx:/paintHD/TMP/painthd_clip.bin`  
+- `./TMP/painthd_clip.bin`  
   Clipboard file.
 
-- `MSCx:/paintHD/TMP/paintHD_c.bin`  
+- `./TMP/paintHD_c.bin`  
   Current snapshot used by undo/redo staging.
 
-- `MSCx:/paintHD/TMP/paintHD_u###.bin`  
+- `./TMP/paintHD_u###.bin`  
   Undo snapshots.
 
-- `MSCx:/paintHD/TMP/paintHD_r###.bin`  
+- `./TMP/paintHD_r###.bin`  
   Redo snapshots.
 
-- `MSCx:/paintHD/TMP/loader_p###.bin`  
+- `./TMP/loader_p###.bin`  
   Cached loader pages with ready-made `1 bpp` thumbnails.
 
-- `paintHD_tmp.bmp`  
+- `./TMP/paintHD_tmp.bin`  
   Temporary canvas file used by the F1 help screen.
 
 ### Main Image Files
@@ -387,27 +395,27 @@ The most important requirement is to place `paintHDloader.rp6502` and `paintHD.r
 - `paintHD_new.bmp`  
   Default file name for a new image.
 
-- `painthd_save.bmp`  
+- `paintHD_save.bmp`  
   Default save/restore file used by startup restore and `Ctrl + Q` exit save.
 
 ## Repository Layout
 
 - `src/`  
-  C source and header files for PaintHD, PaintHD Loader, icons, and BMP helpers.
+  source and header files (CC65)
 
 - `assets/`  
-  Binary assets, generated data, and text documentation such as:
-  - `assets/painthd.txt`
-  - `assets/paintHDloader.txt`
+  Binary assets, generated data
+  
+  `docs/`
+  text documentation such as:
+  - `assets/paintHD.txt`
+  - `assets/paintHDeditor.txt`
 
 - `tools/`  
   Build helper scripts and RP6502-related tooling.
 
 - `build/`  
   Generated build output such as executables and linker maps.
-
-- `.vscode/`  
-  Editor configuration for VSCode / IntelliSense.
 
 ## Notes
 
