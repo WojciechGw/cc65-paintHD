@@ -31,9 +31,8 @@ The suite consists of three programs:
 ### `paintHD`
 
 A launcher for browsing BMP files in the program directory. It shows up to
-`16` thumbnails per page, supports paging with `PgUp` / `PgDn`, and launches
-`paintHD.rp6502` with the selected file. Empty slots can be used to start a new
-image using the default name `paintHD_new.bmp`.
+`9` thumbnails per page, supports paging with `PgUp` / `PgDn`, and launches
+`paintHDeditor.rp6502` with the selected file.
 
 ### `paintHDeditor`
 
